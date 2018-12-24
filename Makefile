@@ -142,11 +142,7 @@ warn:
 # Fake rule to create arbitary headers, to prevent errors if files are moved/renamed
 %.h:
 
-ifdef BUILD_PYTHON_BINDINGS
-shared: build/libxerus_misc.so build/libxerus.so build/xerus.so
-else
 shared: build/libxerus_misc.so build/libxerus.so
-endif
 
 build/libxerus_misc.so: $(MINIMAL_DEPS) $(MISC_SOURCES)
 	mkdir -p $(dir $@)
@@ -157,11 +153,16 @@ build/libxerus.so: $(MINIMAL_DEPS) $(XERUS_SOURCES) build/libxerus_misc.so
 	$(CXX) -shared -fPIC -Wl,-soname,libxerus.so $(FLAGS) -I include $(XERUS_SOURCES) -L ./build/ -Wl,--as-needed -lxerus_misc $(SUITESPARSE) $(LAPACK_LIBRARIES) $(BLAS_LIBRARIES) -o build/libxerus.so
 
 
-python: build/xerus.so
+python: build/python2/xerus.so build/python3/xerus.so
 
-build/xerus.so: $(MINIMAL_DEPS) $(PYTHON_SOURCES) build/libxerus.so
+build/python2/xerus.so: $(MINIMAL_DEPS) $(PYTHON_SOURCES) build/libxerus.so
 	mkdir -p $(dir $@)
-	$(CXX) -shared -fPIC -Wl,-soname,xerus.so `python2-config --cflags --ldflags` $(PYTHON_FLAGS) -I include $(PYTHON_SOURCES) -L ./build/ -Wl,--as-needed -lxerus $(BOOST_PYTHON) -o build/xerus.so
+	$(CXX) -shared -fPIC -Wl,-soname,xerus.so `$(PYTHON2_CONFIG) --cflags --ldflags` $(PYTHON_FLAGS) -I include $(PYTHON_SOURCES) -L ./build/ -Wl,--as-needed -lxerus $(BOOST_PYTHON2) -o $@
+
+build/python3/xerus.so: $(MINIMAL_DEPS) $(PYTHON_SOURCES) build/libxerus.so
+	mkdir -p $(dir $@)
+	@# -fpermissive is needed because of a bug in the definition of BOOST_PYTHON_MODULE_INIT in <boost/python/module_init.h>
+	$(CXX) -shared -fPIC -Wl,-soname,xerus.so `$(PYTHON3_CONFIG) --cflags --ldflags` $(PYTHON_FLAGS) -fpermissive -I include $(PYTHON_SOURCES) -L ./build/ -Wl,--as-needed -lxerus $(BOOST_PYTHON3) -o $@
 
 
 static: build/libxerus_misc.a build/libxerus.a
@@ -183,13 +184,12 @@ else
 endif
 
 
-ifdef DESTDIR
-	INSTALL_LIB_PATH = $(DESTDIR)/lib/
-	INSTALL_HEADER_PATH = $(DESTDIR)/include/
-	INSTALL_PYTHON_PATH = $(DESTDIR)/lib/python/site-packages/
+ifdef INSTALL_PYTHON2_PATH
+install: build/python2/xerus.so
 endif
-
-
+ifdef INSTALL_PYTHON3_PATH
+install: build/python3/xerus.so
+endif
 ifdef INSTALL_LIB_PATH
 ifdef INSTALL_HEADER_PATH
 install: shared
@@ -200,8 +200,13 @@ install: shared
 	cp -r include/xerus $(INSTALL_HEADER_PATH)
 	cp build/libxerus_misc.so $(INSTALL_LIB_PATH)
 	cp build/libxerus.so $(INSTALL_LIB_PATH)
-ifdef BUILD_PYTHON_BINDINGS
-	cp build/xerus.so $(INSTALL_PYTHON_PATH)
+ifdef INSTALL_PYTHON2_PATH
+	@printf "Installing xerus.so to $(strip $(INSTALL_PYTHON2_PATH)).\n"
+	cp build/python2/xerus.so $(INSTALL_PYTHON2_PATH)
+endif
+ifdef INSTALL_PYTHON3_PATH
+	@printf "Installing xerus.so to $(strip $(INSTALL_PYTHON3_PATH)).\n"
+	cp build/python3/xerus.so $(INSTALL_PYTHON3_PATH)
 endif
 else
 install:
@@ -224,6 +229,10 @@ printBoostVersion: build/print_boost_version
 
 test:  $(TEST_NAME)
 	./$(TEST_NAME) all
+
+
+test_python: # build/libxerus.so build/python3/xerus.so
+	@export PYTHONPATH=build/python3:${PYTHONPATH}; export LD_LIBRARY_PATH=build:${LD_LIBRARY_PATH}; pytest src/pyTests
 
 
 fullTest: $(TUTORIALS) $(TEST_NAME)

@@ -999,10 +999,10 @@ namespace xerus {
 				inPosition += blockSize;
 				outPosition += stepSizes[index];
 				while(i%multStep == 0) {
-					outPosition -= dimensions[index]*stepSizes[index]; // "reset" current index to 0
+					outPosition -= _other.dimensions[index]*stepSizes[index]; // "reset" current index to 0
 					--index;							// Advance to next index
 					outPosition += stepSizes[index];	// increase next index
-					multStep *= dimensions[index];		// next stepSize
+					multStep *= _other.dimensions[index];		// next stepSize
 				}
 				
 				misc::add_scaled(outPosition, _other.factor, inPosition, blockSize);
@@ -1708,6 +1708,55 @@ namespace xerus {
 		_X.factor = _B.factor / _A.factor;
 	}
 	
+	double get_smallest_eigenvalue(Tensor& _X, const Tensor& _A) {
+			REQUIRE(_A.is_dense(), "for now only dense is implemented"); //TODO implement sparse
+			REQUIRE(&_X != &_A, "Not supportet yet");
+			REQUIRE(_A.degree() % 2 == 0, "The tensor A needs to be an operator, i.e. has even degree");
+
+			const size_t degN = _A.degree() / 2;
+
+			// Calculate multDimensions
+			const size_t m = misc::product(_A.dimensions, 0, degN);
+			const size_t n = misc::product(_A.dimensions, degN, 2*degN);
+			REQUIRE(m == n, "Inconsistent dimensions.");
+
+			// Make sure X has right dimensions
+			if(	_X.degree() != degN
+				|| !std::equal(_X.dimensions.begin(), _X.dimensions.begin() + degN, _A.dimensions.begin() + degN))
+			{
+				Tensor::DimensionTuple newDimX;
+				newDimX.insert(newDimX.end(), _A.dimensions.begin()+degN, _A.dimensions.end());
+				_X.reset(std::move(newDimX), Tensor::Representation::Dense, Tensor::Initialisation::None);
+			}
+
+			std::unique_ptr<double[]> re(new double[n]);      // real eigenvalues
+			std::unique_ptr<double[]> im(new double[n]);      // imaginary eigenvalues
+			std::unique_ptr<double[]> rev(new double[n * n]); // right eigenvectors
+
+			// Note that A is dense here
+			blasWrapper::solve_ev(
+				rev.get(), // right eigenvectors
+				re.get(),  // real eigenvalues
+				im.get(),  // imaginary eigenvalues
+				_A.get_unsanitized_dense_data(),  n);
+
+			//get eigenvalue with minimal real part
+			double ev = re[0];
+			size_t idx = 0;
+			for (size_t i = 1; i < n; ++i) {
+				if (re[i] < ev){
+					ev = re[i];
+					idx = i;
+				}
+			}
+
+			//get eigenvector oof smallest eigenvalue
+			auto tmpX = _X.override_dense_data();
+			for (size_t i = 0; i < n; ++i)
+				tmpX[i] = rev[idx + i * n];
+
+			return ev;
+		}
 	
 	
 	Tensor entrywise_product(const Tensor &_A, const Tensor &_B) {

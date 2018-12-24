@@ -34,33 +34,6 @@ namespace xerus {
 	thread_local uint64 Index::idCounter = (idThreadInitCounter++)<<54;
 	
 	
-	Index::Index() : valueId(idCounter++), span(1) { }
-	
-	
-	Index::Index(const int32 _i) : Index(static_cast<uint64>(_i)) {
-		REQUIRE(_i >= 0, "Negative valueId= " <<_i<< " given");
-	}
-	
-	Index::Index(const uint32 _i) noexcept : valueId(_i), span(1) {
-		flags[Flag::FIXED] = true;
-	}
-	
-	Index::Index(const int64 _i) : Index(static_cast<uint64>(_i)) {
-		REQUIRE(_i >= 0, "Negative valueId= " <<_i<< " given");
-	}
-	
-	Index::Index(const uint64 _i) noexcept : valueId(_i), span(1) {
-		flags[Flag::FIXED] = true;
-	}
-	
-	Index::Index(const uint64 _valueId, const size_t _span) noexcept : valueId(_valueId), span(_span) {}
-	
-	
-	Index::Index(const uint64 _valueId, const size_t _span, const Flag _flag1) noexcept : valueId(_valueId), span(_span) {
-		flags[_flag1] = true;
-	}
-	
-	
 	void Index::set_span(const size_t _degree) {
 		REQUIRE(!flags[Flag::FIXED] || span == 1, "Fixed indices must have span one.");
 		if(flags[Flag::INVERSE_SPAN]) {

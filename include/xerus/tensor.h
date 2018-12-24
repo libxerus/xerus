@@ -1014,6 +1014,15 @@ namespace xerus {
 	 * @param _extraDegree number of modes that @a _x and @a _B sharefor which the solution should be computed independently.
 	 */
 	void solve(Tensor &_X, const Tensor &_A, const Tensor &_B, size_t _extraDegree = 0);
+
+	/**
+	 * @brief Solves the equation A*x = lambda*x for x and lambda and A symmetric. It calls the LAPACK routine DGEEV. It calculates the eigenvalue with smallest real part.
+	 * @param _X Output Tensor for the result
+	 * @param _A input Operator A symmetric with respect to matrification
+	 * @return the smallest eigenvalue
+	 */
+	double get_smallest_eigenvalue(Tensor &_X, const Tensor &_A);
+
 	
 	/**
 	 * @brief calculates the entrywise product of two Tensors

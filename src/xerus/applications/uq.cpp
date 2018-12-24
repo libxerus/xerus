@@ -48,9 +48,9 @@ namespace xerus { namespace uq {
 	Tensor hermite_evaluation(const double _v, const size_t _basisSize) {
 		Tensor p({_basisSize});
 		for (unsigned i = 0; i < _basisSize; ++i) {
-			p[i] = boost::math::hermite(i, _v/std::sqrt(2))/std::pow(2.0, i/2.0);
+			p[i] = std::sqrt(1/(/*std::sqrt(2*M_PI)**/boost::math::factorial<double>(i)))*boost::math::hermite(i, _v/std::sqrt(2))/std::pow(2.0, i/2.0);
 		}
-		return p;
+		return p; 
 	}
 	
 	
@@ -72,7 +72,12 @@ namespace xerus { namespace uq {
 		while(m1TT.degree() > 1) {
 			m1TT.fix_mode(1, 0);
 		}
-		Tensor m1 = Tensor(m1TT);
+		double m1Factor = 1.0;
+		if(_basisType == PolynomBasis::Hermite) {
+// 			m1Factor = 1/(std::sqrt(2*M_PI));
+// 			m1Factor = 1.0/10.0;
+		}
+		Tensor m1 = m1Factor*Tensor(m1TT);
 		
 		// M2
 		Tensor spacialCmp = _x.get_component(0);

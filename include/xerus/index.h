@@ -73,28 +73,31 @@ namespace xerus {
 		
 		
 		/// @brief Empty constructor that creates a new Index with new ID. Use this to create indices.
-		Index();
+		Index() : valueId(idCounter++), span(1) { };
 		
 		/// @brief Indices are default copy constructable.
 		Index(const Index& _other) noexcept = default;
 		
 		/// @brief Integers are implicitly allowed to be casted to Index, to allow expression as A(i) = B(3,i), i.e. A is the third row of B.
-		Index(const int32 _i);
+		template<class I, typename std::enable_if<std::is_integral<I>::value && std::is_unsigned<I>::value, bool>::type = true> 
+		Index(const I _i) noexcept : valueId(_i), span(1) {
+			flags[Flag::FIXED] = true;
+		}
 		
 		/// @brief Integers are implicitly allowed to be casted to Index, to allow expression as A(i) = B(3,i), i.e. A is the third row of B.
-		Index(const uint32 _i) noexcept;
-		
-		/// @brief Integers are implicitly allowed to be casted to Index, to allow expression as A(i) = B(3,i), i.e. A is the third row of B.
-		Index(const int64 _i);
-		
-		/// @brief Integers are implicitly allowed to be casted to Index, to allow expression as A(i) = B(3,i), i.e. A is the third row of B.
-		Index(const uint64 _i) noexcept;
+		template<class I, typename std::enable_if<std::is_integral<I>::value && !std::is_unsigned<I>::value, bool>::type = true> 
+		Index(const I _i) : Index(static_cast<uint64>(_i)) {
+			using ::xerus::misc::operator<<;
+			XERUS_REQUIRE(_i >= 0, "Negative valueId= " <<_i<< " given");
+		}
 
 		/// @brief Internal constructor, do not use this unless you know what you are doing.
-		explicit Index(const uint64 _valueId, const size_t _span) noexcept;
+		explicit Index(const uint64 _valueId, const size_t _span) noexcept : valueId(_valueId), span(_span) {};
 		
 		/// @brief Internal constructor, do not use this unless you know what you are doing.
-		explicit Index(const uint64 _valueId, const size_t _span, const Flag _flag1) noexcept;
+		explicit Index(const uint64 _valueId, const size_t _span, const Flag _flag1) noexcept : valueId(_valueId), span(_span) {
+			flags[_flag1] = true;
+		}
 		
 		
 		

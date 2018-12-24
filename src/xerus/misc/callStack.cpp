@@ -26,6 +26,14 @@
 
 #ifndef XERUS_NO_FANCY_CALLSTACK
     #include <execinfo.h>
+    
+	// workaround for deliberately incompatible bfd.h header files on some systems.
+	#ifndef PACKAGE
+		#define PACKAGE
+	#endif
+	#ifndef PACKAGE_VERSION
+		#define PACKAGE_VERSION
+	#endif
     #include <bfd.h>
     #include <dlfcn.h>
     #include <unistd.h>

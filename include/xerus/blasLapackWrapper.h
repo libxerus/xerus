@@ -131,7 +131,8 @@ namespace xerus {
 		///@brief: Solves Ax = b for x
 		void solve(double* _x, const double* _A, size_t _m, size_t _n, const double* _b, size_t _p);
 		
-		
+		///@brief: Solves Ax = lambda*x for x, this calls the Lapack Routine DGEEV
+		void solve_ev(double* const _x, double* const _re, double* const _im, const double* const _A, const size_t _n);
 		
 		///@brief: Solves min ||Ax - b||_2 for x
 		void solve_least_squares( double* const _x, const double* const _A, const size_t _m, const size_t _n, const double* const _b, const size_t _p);

@@ -46,35 +46,15 @@ namespace xerus {
 		
 		
 		///@brief: Calculates _base^_exp by binary exponentiation
-		template<class T> 
-		constexpr T pow(const T& _base, const uint32 _exp) noexcept {
-			return _exp==0 ? T(1) : (_exp%2==0 ? pow(T(_base*_base), _exp/2) : T(_base*pow(_base, _exp-1)));
-		}
-		
-		///@brief: Calculates _base^_exp by binary exponentiation
-		template<class T> 
-		constexpr T pow(const T &_base, const uint64 _exp) noexcept {
+		template<class T, class I, typename std::enable_if<std::is_integral<I>::value && std::is_unsigned<I>::value, bool>::type = true> 
+		constexpr T pow(const T &_base, const I _exp) noexcept {
 			return _exp==0 ? T(1) : (_exp%2==0 ? pow(T(_base*_base), _exp/2) : T(_base*pow(_base, _exp-1)));
 		}
 		
 		
 		///@brief: Calculates _base^_exp by binary exponentiation
-		template<class T> 
-		constexpr T pow(const T &_base, const int64 _exp) noexcept {
-			return _exp==0 ? 
-						T(1) :
-						(
-							_exp<0 ? 
-								T( 1/pow(_base, -_exp)) 
-							: 
-								( _exp%2==0 ? pow(T(_base*_base), _exp/2) : T(_base*pow(_base, _exp-1)) )
-						);
-		}
-		
-		
-		///@brief: Calculates _base^_exp by binary exponentiation
-		template<class T> 
-		constexpr T pow(const T &_base, const int32 _exp) noexcept {
+		template<class T, class I, typename std::enable_if<std::is_integral<I>::value && !std::is_unsigned<I>::value, bool>::type = true> 
+		constexpr T pow(const T &_base, const I _exp) noexcept {
 			return _exp==0 ? 
 						T(1) :
 						(

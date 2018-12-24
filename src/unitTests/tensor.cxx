@@ -287,5 +287,22 @@ static misc::UnitTest tensor_sparse_dense("Tensor", "Sparse_Dense_Conversions", 
 	TEST(R.representation == Tensor::Representation::Dense);
 });
 
+static misc::UnitTest tensor_offset_add("Tensor", "Check_Offset_Add", [](){
+	auto first  = xerus::Tensor::dirac({1,1,1,1},0);
+	auto second  = xerus::Tensor::dirac({2,2,1,1},0);
+	second[3] = 4;
+	second[1] = 2;
+	second[2] = 3;
+	std::unique_ptr<Tensor> comb(new Tensor({3,3,2,2}));
+	comb->offset_add(first, std::vector<size_t>({0,0,0,0}));
+	comb->offset_add(second, std::vector<size_t>({1,1,1,1}));
+	TEST(((*comb)[0] - 1) * ((*comb)[0] - 1) <= 0.01);
+	TEST(((*comb)[19] - 1) * ((*comb)[19] - 1) <= 0.01);
+	TEST(((*comb)[23] - 2) * ((*comb)[23] - 2) <= 0.01);
+	TEST(((*comb)[31] - 3) * ((*comb)[31] - 3) <= 0.01);
+	TEST(((*comb)[35] - 4) * ((*comb)[35] - 4) <= 0.01);
+	TEST(((*comb)[1]) * ((*comb)[1]) <= 0.01);
+	TEST(((*comb)[2]) * ((*comb)[2]) <= 0.01);
 
+});
 

@@ -244,6 +244,38 @@ namespace xerus {
          */
         static TTNetwork XERUS_warn_unused dirac(std::vector<size_t> _dimensions, const size_t _position);
 
+        /**
+         * @brief  constructs a constant TTNetwork with the given dimensions and ranks.
+         * @param _dimensions the dimensions of the to be created TTNetwork.
+         * @param _ranks the ranks of the to be created TTNetwork.
+         * TODO wright Tests
+         */
+        static TTNetwork XERUS_warn_unused constant(value_t constant, std::vector<size_t> _dimensions, const std::vector<size_t> &_ranks) {
+            const size_t numComponents = _dimensions.size()/N;
+            XERUS_REQUIRE(_dimensions.size()%N==0, "Illegal number of dimensions for TTOperator.");
+            XERUS_REQUIRE(_ranks.size()+1 == numComponents,"Non-matching amount of ranks given to TTNetwork::random.");
+            XERUS_REQUIRE(!misc::contains(_dimensions, size_t(0)), "Trying to construct a TTTensor with dimension 0 is not possible.");
+            XERUS_REQUIRE(!misc::contains(_ranks, size_t(0)), "Trying to construct random TTTensor with rank 0 is illegal.");
+
+            TTNetwork result(_dimensions.size());
+            const std::vector<size_t> targetRank = reduce_to_maximal_ranks(_ranks, _dimensions);
+
+            for(size_t i = 0; i < numComponents; ++i) {
+                const size_t leftRank = i==0 ? 1 : targetRank[i-1];
+                const size_t rightRank = (i==numComponents-1) ? 1 : targetRank[i];
+
+                if(isOperator) {
+                    const auto constCmp = constant * Tensor::ones({leftRank, _dimensions[i], _dimensions[numComponents+i], rightRank});
+                    result.set_component(i, constCmp);
+                } else {
+                  const auto constCmp = constant * Tensor::ones({leftRank, _dimensions[i], rightRank});
+                    result.set_component(i, constCmp);
+                }
+            }
+            //result.move_core(0);
+            return result;
+        }
+
         /*- - - - - - - - - - - - - - - - - - - - - - - - - - Standard Operators - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -*/
         ///@brief TTNetworks are default assignable.
         TTNetwork& operator=(const TTNetwork&  _other) = default;

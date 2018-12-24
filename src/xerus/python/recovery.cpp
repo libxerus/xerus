@@ -23,6 +23,7 @@
  */
 
 
+#define NO_IMPORT_ARRAY
 #include "misc.h"
 // using namespace uq;
 
@@ -171,6 +172,11 @@ void expose_recoveryAlgorithms() {
     def("uq_ra_adf", +[](const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
             return uq::uq_ra_adf(_measurements, _basisType, _dimensions, _targetEps, _maxItr);
             }, (arg("measurements"), arg("polynombasis"), arg("dimensions"), arg("targeteps"), arg("maxitr"))
+       );
+
+    def("uq_ra_adf_iv", +[](TTTensor& _x, const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const double _targetEps, const size_t _maxItr){
+            return uq::uq_ra_adf_iv(_x, _measurements, _basisType, _targetEps, _maxItr);
+            }, (arg("initial guess"), arg("measurements"), arg("polynombasis"), arg("targeteps"), arg("maxitr"))
        );
 
     def("uq_tt_evaluate", +[](const TTTensor& _x, const std::vector<double>& _parameters, const uq::PolynomBasis _basisType) {

@@ -48,6 +48,7 @@ BOOST_PYTHON_MODULE(xerus) {
     expose_tensor();
     expose_tensorNetwork();
     expose_ttnetwork();
+    expose_htnetwork();
 
     expose_leastSquaresAlgorithms();
     expose_recoveryAlgorithms();
