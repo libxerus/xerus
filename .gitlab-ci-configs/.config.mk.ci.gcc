@@ -2,7 +2,7 @@
 # Compiler Options
 #=================================================================================================
 CXX = g++
-COMPATIBILITY = -std=c++11
+COMPATIBILITY = -std=c++14
 
 ACTIVATE_CODE_COVERAGE = TRUE                 # Enable coverage tests
 DEBUG += -D _GLIBCXX_ASSERTIONS        # Activate GLIBCXX assertions
