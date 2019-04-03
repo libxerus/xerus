@@ -34,7 +34,7 @@ job_test_gcc_nocheck:
 
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt; tail -100 build/debug.txt"
   when: always
 
 job_build_python2:
