@@ -26,6 +26,6 @@ job_code_coverage:
 
 job_code_coverage_print:
   stage: code_coverage_print
-  script: "echo 'build/build_output.txt'; tail -n 500 build/build_output.txt; echo 'required_tests.txt'; cat build/required_tests.txt"
+  script: "echo 'build_output.txt:'; tail -n 500 build/build_output.txt; echo 'required_tests.txt:'; cat build/required_tests.txt"
   when: always
 
