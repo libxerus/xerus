@@ -15,4 +15,4 @@ DEBUG += -g                # Adds debug symbols
 BLAS_LIBRARIES = -lopenblas -lgfortran                    # Openblas, serial
 LAPACK_LIBRARIES = -llapacke -llapack                     # Standard Lapack + Lapacke libraries
 SUITESPARSE = -lcholmod  -lspqr
-BOOST_LIBS = -lboost_filesystem
+BOOST_LIBS = -lboost_filesystem -lboost_system
