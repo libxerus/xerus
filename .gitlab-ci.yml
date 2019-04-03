@@ -14,6 +14,7 @@ cache:
   paths:
     - build/
     - build/debug.txt
+    - build/build_output.txt
     - XerusTest
 
 job_build_homepage:
@@ -26,12 +27,12 @@ job_build_homepage:
 
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; mkdir -p build; make test &> build/debug.txt || true; tail -100 build/debug.txt; tail -100 build/build_output.txt; echo 'Yes?'"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; mkdir -p build; make test &> build/debug.txt; tail -100 build/debug.txt; tail -100 build/build_output.txt; echo 'Yes?'"
   when: always
 
 job_code_coverage_print:
   stage: code_coverage_print
-  script: "tail -100 build/debug.txt; tail -100 build/build_output.txt"
+  script: "echo 'debug.txt'; cat build/debug.txt; echo 'build_output.txt'; cat build/build_output.txt"
   when: always
 
 job_build_python2:
