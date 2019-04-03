@@ -23,14 +23,6 @@ job_build_homepage:
     - master
   allow_failure: true
 
-job_make_gcc_nocheck:
-  stage: build_gcc_nocheck
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.nocheck config.mk; make XerusTest"
-
-job_test_gcc_nocheck:
-  stage: test_gcc_nocheck
-  script: "echo $CI_COMMIT_SHA; ./XerusTest all"
-
 job_code_coverage:
   stage: code_coverage
   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt; tail -100 build/debug.txt; tail -100 build/build_output.txt"
