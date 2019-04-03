@@ -235,9 +235,9 @@ printBoostVersion: build/print_boost_version
 
 ifdef ACTIVATE_CODE_COVERAGE
 test:
-	@ mkdir -p build
-	@ $(MAKE) $(TEST_NAME) &> build/build_output.txt
-	@ cat build/build_output.txt | grep "‘EnumMarker’ is deprecated" > build/required_tests.txt
+	mkdir -p build
+	$(MAKE) $(TEST_NAME) &> build/build_output.txt
+	cat build/build_output.txt | grep "‘EnumMarker’ is deprecated" > build/required_tests.txt
 	./$(TEST_NAME) all
 else
 test:  $(TEST_NAME)
