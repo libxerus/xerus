@@ -13,8 +13,6 @@ cache:
   key: "$CI_COMMIT_SHA"
   paths:
     - build/
-    - build/debug.txt
-    - build/build_output.txt
     - XerusTest
 
 job_build_homepage:
@@ -25,9 +23,10 @@ job_build_homepage:
     - master
   allow_failure: true
 
+
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; mkdir -p build; make test &> build/debug.txt; tail -100 build/debug.txt; tail -100 build/build_output.txt; echo 'Yes?'"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt"
   when: always
 
 job_code_coverage_print:

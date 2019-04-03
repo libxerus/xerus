@@ -35,7 +35,9 @@
 #define LOCATION __FILE__ ":" S2(__LINE__)
 #define LOCATION_MARKED "@" LOCATION "@"
 
-#define XERUS_CC_MARK_WARNING enum [[deprecated(LOCATION_MARKED)]] EnumMarker {}; [[maybe_unused]] EnumMarker trigger;
+// #define XERUS_CC_MARK_WARNING enum [[deprecated(LOCATION_MARKED)]] EnumMarker {}; [[maybe_unused]] EnumMarker trigger;
+
+#define XERUS_CC_MARK_WARNING
 
 
 /**

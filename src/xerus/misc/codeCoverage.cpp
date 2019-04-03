@@ -94,7 +94,7 @@ namespace xerus { namespace misc { namespace CodeCoverage {
 			if(requiredTests[file].count(lineNumber) == 0) {
 				requiredTests[file][lineNumber][unknownName] = false;
 			}
-		}
+		} 
 		
 		// Assing covered tests to required ones
 		for( const auto &test : *testsCovered ) {
