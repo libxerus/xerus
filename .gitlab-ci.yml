@@ -1,8 +1,7 @@
 stages:
 - build_homepage
-- build_gcc_nocheck
-- test_gcc_nocheck
 - code_coverage
+- code_coverage_print
 - build_python2
 - build_python3
 - test_python2
@@ -34,7 +33,12 @@ job_test_gcc_nocheck:
 
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt; tail -100 build/debug.txt"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; make test &> build/debug.txt; tail -100 build/debug.txt; tail -100 build/build_output.txt"
+  when: always
+
+job_code_coverage_print:
+  stage: code_coverage_print
+  script: "cat build/build_output.txt"
   when: always
 
 job_build_python2:
