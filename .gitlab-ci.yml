@@ -21,7 +21,7 @@ job_build_homepage:
 
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; mkdir -p build; make test &> build/build_output.txt || tail -n 500 build/build_output.txt; tail -n 500 build/build_output.txt"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc config.mk; mkdir -p build; make test &> build/build_output.txt || tail -n 500 build/build_output.txt; tail -n 500 build/build_output.txt" 
   when: always
 
 job_code_coverage_print:
