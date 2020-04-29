@@ -4,7 +4,7 @@ package:
 
 source:
   git_url: https://github.com/libxerus/xerus.git
-  git_tag: conda
+  git_tag: development
 
 requirements:
   build:
@@ -16,11 +16,10 @@ requirements:
     - boost=1.69.0
     - python=3.7
     - numpy>=1.16
-    - binutils
-    - gdb
-    - backward-cpp
+    #- binutils      # former source of bfd
+    #- gdb           # bfd
+    #- backward-cpp  # option for better python-like backtraces
     - openmp
-
   run:
     - openblas
     - suitesparse
@@ -28,30 +27,30 @@ requirements:
     - boost=1.69.0
     - python=3.7
     - numpy>=1.16
-    - binutils
-    - gdb
-    - backward-cpp
+    #- binutils      # former source of bfd
+    #- gdb           # bfd
+    #- backward-cpp  # option for better python-like backtraces
     - openmp
 
-test:
-  files:
-    - Makefile
-
-  source_files:
-    - makeIncludes
-    - src/xerus/test
-    - src/unitTests
-    - src/pyTests
-
-  requires:
-    - make
-    - {{ compiler('cxx') }}
-    - pytest
+#test:
+#  files:
+#    - Makefile
+#
+#  source_files:
+#    - makeIncludes
+#    - src/xerus/test
+#    - src/unitTests
+#    - src/pyTests
+#
+#  requires:
+#    - make
+#    - {{ compiler('cxx') }}
+#    - pytest
 
 build:
   # already linked relative to $ORIGIN, so we need to turn
   # off conda's relocation mechanism because it screws it up
-  binary_relocation: false
+  binary_relocation: true
 
 about:
   home: https://git.hemio.de/xerus/xerus.git
