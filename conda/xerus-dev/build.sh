@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e  # exit when any command fails
+
 cat <<EOF >config.mk
 CXX = ${CXX}
 COMPATIBILITY = -std=c++17
@@ -29,16 +31,17 @@ BOOST_PYTHON3 = -lboost_python37
 OTHER+= -L${BUILD_PREFIX}/lib
 EOF
 
+test ${CONDA_PY} = ${PY_VER//./}  # this should always be the case
 
 export CPP_INCLUDE_PATH=${BUILD_PREFIX}/include:${BUILD_PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
 export CPLUS_INCLUDE_PATH=${BUILD_PREFIX}/include:${BUILD_PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
 export CXX_INCLUDE_PATH=${BUILD_PREFIX}/include:${BUILD_PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
 export LIBRARY_PATH=${BUILD_PREFIX}/lib
 
-ln -s ${BUILD_PREFIX}/include/ ${BUILD_PREFIX}/include/suitesparse
+ln -sfn ${BUILD_PREFIX}/include/ ${BUILD_PREFIX}/include/suitesparse  # overwrite existing symbolic links
 mkdir -p ${PREFIX}/lib/python${PY_VER}
 
-make test -j4
+make test -j$((${CPU_COUNT}-1))
 
 make install
 rm config.mk

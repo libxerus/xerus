@@ -1,4 +1,4 @@
-.PHONY: help shared static python doc install test clean opt warn printBoostVersion
+.PHONY: help version shared static python doc install test clean opt warn printBoostVersion
 
 # ------------------------------------------------------------------------------------------------------
 #				Default rule should be the help message
@@ -23,16 +23,17 @@ help:
 TEST_NAME = XerusTest
 
 # xerus version from VERSION file
-XERUS_VERSION = $(shell git describe --tags --always 2>/dev/null || cat VERSION)
+# XERUS_VERSION = $(shell git describe --tags --always 2>/dev/null || cat VERSION)  # git should not be an explicit dependency
+XERUS_VERSION = $(shell cat VERSION)
 DEBUG += -D XERUS_VERSION="$(XERUS_VERSION)"
 
 XERUS_MAJOR_V = $(word 1, $(subst ., ,$(XERUS_VERSION)) )
 ifneq (,$(findstring v, $(XERUS_MAJOR_V)))
 	XERUS_MAJOR_V := $(strip $(subst v, ,$(XERUS_MAJOR_V)) )
 endif
-DEBUG += -DXERUS_VERSION_MAJOR=$(XERUS_MAJOR_V)
+DEBUG += -D XERUS_VERSION_MAJOR="$(XERUS_MAJOR_V)"
 XERUS_MINOR_V = $(word 2, $(subst ., ,$(XERUS_VERSION)) )
-DEBUG += -DXERUS_VERSION_MINOR=$(XERUS_MINOR_V)
+DEBUG += -D XERUS_VERSION_MINOR="$(XERUS_MINOR_V)"
 XERUS_REVISION_V = $(word 3, $(subst ., ,$(XERUS_VERSION)) )
 ifneq (,$(findstring -, $(XERUS_REVISION_V)))
 	XERUS_COMMIT_V := $(word 2, $(subst -, ,$(XERUS_REVISION_V)) )
@@ -42,6 +43,13 @@ else
 endif
 DEBUG += -DXERUS_VERSION_REVISION=$(XERUS_REVISION_V)
 DEBUG += -DXERUS_VERSION_COMMIT=$(XERUS_COMMIT_V)
+
+version:
+	@echo $(XERUS_VERSION)
+	@echo MAYOR: $(XERUS_MAJOR_V)
+	@echo MINOR: $(XERUS_MINOR_V)
+	@echo REVISION: $(XERUS_REVISION_V)
+	@echo COMMIT: $(XERUS_COMMIT_V)
 
 
 # ------------------------------------------------------------------------------------------------------
@@ -229,7 +237,7 @@ build/print_boost_version: src/print_boost_version.cpp
 printBoostVersion: build/print_boost_version
 	@build/print_boost_version
 
-test:  $(TEST_NAME)
+test: $(TEST_NAME)
 	./$(TEST_NAME) all
 
 
