@@ -42,6 +42,11 @@ The key features include:\n\
 ";
 
 	// xerus version
+	{
+		std::ostringstream tmp;
+		tmp << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_REVISION;
+		m.attr("__version__") = tmp.str();
+	}
 	m.attr("VERSION_MAJOR") = VERSION_MAJOR;
 	m.attr("VERSION_MINOR") = VERSION_MINOR;
 	m.attr("VERSION_REVISION") = VERSION_REVISION;
