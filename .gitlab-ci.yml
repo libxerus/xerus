@@ -52,18 +52,18 @@ job_build_python:
 #   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make test_python3"
 #   when: always
 
-# job_make_clang:
-#   stage: build_clang
-#   script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest"
-#   when: always
-#   artifacts:
-#     expire_in: 1h30min
-#     paths:
-#       - XerusTest
+job_make_clang:
+  stage: build_clang
+  script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest"
+  when: always
+  artifacts:
+    expire_in: 1h30min
+    paths:
+      - XerusTest
 
-# job_test_clang:
-#   stage: test_clang
-#   script: "echo $CI_COMMIT_SHA; ./XerusTest all"
-#   dependencies:
-#     - job_make_clang
+job_test_clang:
+  stage: test_clang
+  script: "echo $CI_COMMIT_SHA; ./XerusTest all"
+  dependencies:
+    - job_make_clang
 
