@@ -3,12 +3,11 @@
 #=================================================================================================
 CXX = g++
 COMPATIBILITY = -std=c++11
-PYTHON2_CONFIG = `python2-config --cflags --ldflags`
 PYTHON3_CONFIG = `python3-config --cflags --ldflags`
-PYTEST2 = python2 -m pytest
 PYTEST3 = python3 -m pytest
 
 DEBUG += -g                # Adds debug symbols
+LOGGING += -D XERUS_LOG_INFO                     # Information that is not linked to any unexpected behaviour but might nevertheless be of interest.
 
 #=================================================================================================
 # External libraries
@@ -18,7 +17,7 @@ LAPACK_LIBRARIES = -llapacke -llapack                     # Standard Lapack + La
 SUITESPARSE = -lcholmod  -lspqr
 BOOST_LIBS = -lboost_filesystem
 
-OTHER += -I /usr/include/python2.7/ -lboost_python -I/usr/lib64/python2.7/site-packages/numpy/core/include/ -lpython2.7 -fno-var-tracking-assignments
+# OTHER += -I /usr/include/python2.7/ -lboost_python -I/usr/lib64/python2.7/site-packages/numpy/core/include/ -lpython2.7 -fno-var-tracking-assignments
 
 # BOOST_PYTHON2 = -lboost_python-py27
 # BOOST_PYTHON3 = -lboost_python-py35

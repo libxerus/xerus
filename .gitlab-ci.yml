@@ -3,12 +3,10 @@ stages:
 - build_gcc_nocheck
 - test_gcc_nocheck
 - code_coverage
-- build_python2
-- build_python3
-- test_python2
-- test_python3
-- build_clang
-- test_clang
+- build_python
+# - test_python
+# - build_clang
+# - test_clang
 
 job_build_homepage:
   stage: build_homepage
@@ -42,42 +40,30 @@ job_code_coverage:
     paths:
       - build/build_output.txt
 
-job_build_python2:
-  stage: build_python2
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make python2"
+job_build_python:
+  stage: build_python
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make python"
   when: always
   variables:
     GIT_SUBMODULE_STRATEGY: normal
 
-job_build_python3:
-  stage: build_python3
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make python3"
-  when: always
-  variables:
-    GIT_SUBMODULE_STRATEGY: normal
+# job_test_python:
+#   stage: test_python
+#   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make test_python3"
+#   when: always
 
-job_test_python2:
-  stage: test_python2
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make test_python2"
-  when: always
+# job_make_clang:
+#   stage: build_clang
+#   script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest"
+#   when: always
+#   artifacts:
+#     expire_in: 1h30min
+#     paths:
+#       - XerusTest
 
-job_test_python3:
-  stage: test_python3
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make test_python3"
-  when: always
-
-job_make_clang:
-  stage: build_clang
-  script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest"
-  when: always
-  artifacts:
-    expire_in: 1h30min
-    paths:
-      - XerusTest
-
-job_test_clang:
-  stage: test_clang
-  script: "echo $CI_COMMIT_SHA; ./XerusTest all"
-  dependencies:
-    - job_make_clang
+# job_test_clang:
+#   stage: test_clang
+#   script: "echo $CI_COMMIT_SHA; ./XerusTest all"
+#   dependencies:
+#     - job_make_clang
 

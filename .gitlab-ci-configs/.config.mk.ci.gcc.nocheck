@@ -6,18 +6,17 @@ COMPATIBILITY = -std=c++11
 
 STRICT_WARNINGS = TRUE
 
-DEBUG += -D XERUS_DISABLE_RUNTIME_CHECKS    # Disable all runtime checks
-DEBUG += -D XERUS_REPLACE_ALLOCATOR
+DEBUG += -D XERUS_DISABLE_RUNTIME_CHECKS  # Disable all runtime checks
+# DEBUG += -D XERUS_REPLACE_ALLOCATOR #TODO: generates an error on compilation
 
-DEBUG += -g                # Adds debug symbols
-
-LOGGING += -D XERUS_LOG_INFO                     # Information that is not linked to any unexpected behaviour bu
+DEBUG += -g                               # Adds debug symbols
+LOGGING += -D XERUS_LOG_INFO              # Information that is not linked to any unexpected behaviour bu
 
 #=================================================================================================
 # External libraries
 #=================================================================================================
-BLAS_LIBRARIES = -lopenblas -lgfortran                    # Openblas, serial
-LAPACK_LIBRARIES = -llapacke -llapack                     # Standard Lapack + Lapacke libraries
+BLAS_LIBRARIES = -lopenblas -lgfortran    # Openblas, serial
+LAPACK_LIBRARIES = -llapacke -llapack     # Standard Lapack + Lapacke libraries
 SUITESPARSE = -lcholmod -lspqr
 BOOST_LIBS = -lboost_filesystem
 
