@@ -5,8 +5,8 @@ stages:
 - code_coverage
 - build_python
 # - test_python
-# - build_clang
-# - test_clang
+- build_clang
+- test_clang
 
 job_build_homepage:
   stage: build_homepage
@@ -35,6 +35,8 @@ job_code_coverage:
   stage: code_coverage
   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.cc config.mk; mkdir -p build; make test &> build/build_output.txt || { tail -n 500 build/build_output.txt && readelf -S XerusTest && objdump -s -j .cc_loc XerusTest && false; }; tail -n 500 build/build_output.txt"
   when: always
+  only:
+    - master
   artifacts:
     expire_in: 3h
     paths:
