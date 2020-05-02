@@ -18,22 +18,22 @@ job_build_homepage:
 
 job_make_gcc_nocheck:
   stage: build_gcc_nocheck
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.nocheck config.mk; make XerusTest"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.nocheck config.mk; make XerusTest_static"
   artifacts:
     expire_in: 1h30min
     paths:
-      - XerusTest
+      - XerusTest_static
 
 job_test_gcc_nocheck:
   stage: test_gcc_nocheck
-  script: "echo $CI_COMMIT_SHA; ./XerusTest all"
+  script: "echo $CI_COMMIT_SHA; ./XerusTest_static all"
   dependencies:
     - job_make_gcc_nocheck
 
 
 job_code_coverage:
   stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.cc config.mk; mkdir -p build; make test &> build/build_output.txt || { tail -n 500 build/build_output.txt && readelf -S XerusTest && objdump -s -j .cc_loc XerusTest && false; }; tail -n 500 build/build_output.txt"
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.cc config.mk; mkdir -p build; make test &> build/build_output.txt || { tail -n 500 build/build_output.txt && readelf -S XerusTest_static && objdump -s -j .cc_loc XerusTest_static && false; }; tail -n 500 build/build_output.txt"
   when: always
   only:
     - master
@@ -56,16 +56,16 @@ job_build_python:
 
 job_make_clang:
   stage: build_clang
-  script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest"
+  script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest_static"
   when: always
   artifacts:
     expire_in: 1h30min
     paths:
-      - XerusTest
+      - XerusTest_static
 
 job_test_clang:
   stage: test_clang
-  script: "echo $CI_COMMIT_SHA; ./XerusTest all"
+  script: "echo $CI_COMMIT_SHA; ./XerusTest_static all"
   dependencies:
     - job_make_clang
 
