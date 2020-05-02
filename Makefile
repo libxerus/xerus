@@ -23,7 +23,8 @@ help:
 # ------------------------------------------------------------------------------------------------------
 
 # Name of the test executable
-TEST_NAME = XerusTest
+TEST_NAME = XerusTest_static
+# TEST_NAME = XerusTest_dynamic
 
 
 # ------------------------------------------------------------------------------------------------------
@@ -291,8 +292,11 @@ install:
 	@printf "Cannot install xerus: INSTALL_LIB_PATH not set.  Please set the path in config file.\n"
 endif
 
-$(TEST_NAME): $(MINIMAL_DEPS) $(UNIT_TEST_OBJECTS) $(TEST_OBJECTS) build/libxerus.a build/libxerus_misc.a | libxerus_misc_dependencies libxerus_dependencies
+XerusTest_static: $(MINIMAL_DEPS) $(UNIT_TEST_OBJECTS) $(TEST_OBJECTS) build/libxerus.a build/libxerus_misc.a | libxerus_misc_dependencies libxerus_dependencies
 	$(CXX) -D XERUS_UNITTEST $(FLAGS) $(UNIT_TEST_OBJECTS) $(TEST_OBJECTS) build/libxerus.a build/libxerus_misc.a $(SUITESPARSE) $(LAPACK_LIBRARIES) $(ARPACK_LIBRARIES) $(BLAS_LIBRARIES) $(BOOST_LIBS) $(CALLSTACK_LIBS) -o $(TEST_NAME)
+
+XerusTest_dynamic: $(MINIMAL_DEPS) $(UNIT_TEST_OBJECTS) $(TEST_OBJECTS) build/libxerus.so build/libxerus_misc.so | libxerus_misc_dependencies libxerus_dependencies
+	$(CXX) -D XERUS_UNITTEST $(FLAGS) $(UNIT_TEST_OBJECTS) $(TEST_OBJECTS) build/libxerus.so build/libxerus_misc.so $(SUITESPARSE) $(LAPACK_LIBRARIES) $(ARPACK_LIBRARIES) $(BLAS_LIBRARIES) $(BOOST_LIBS) $(CALLSTACK_LIBS) -o $(TEST_NAME)
 
 build/print_boost_version: src/print_boost_version.cpp
 	@$(CXX) -o $@ $<
