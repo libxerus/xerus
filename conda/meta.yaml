@@ -1,0 +1,55 @@
+{% set name = "Xerus" %}
+{% set version = "4.0.1" %}
+{% set branch = "pybind11" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  - git_url: https://github.com/libxerus/xerus.git
+    git_tag: {{ branch }}
+    # git_depth: 1  # perform shallow clone
+    folder: xerus
+
+build:
+  skip: true  # [py<34 or win]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - make
+    - openblas
+    - suitesparse
+    - lapack
+    - openmp
+    - boost >=1.69.0
+    - python
+    - numpy {{ numpy }}
+    #- gdb           # bfd
+    #- backward-cpp  # option for better python-like backtraces
+  run:
+    - openblas
+    - suitesparse
+    - lapack
+    - openmp
+    - boost >=1.69.0
+    - python
+    - numpy {{ numpy }}
+    #- gdb           # bfd
+    #- backward-cpp  # option for better python-like backtraces
+
+about:
+  home: https://git.hemio.de/xerus/xerus.git
+  license: "AGPL 3.0"
+  license_file: LICENSE
+  summary: "A c++ library for numerical calculations with higher order tensors"
+  description: |
+    The Xerus library is a general purpose library for numerical calculations with higher order tensors, Tensor-Train Decompositions / Matrix Product States and other Tensor Networks.
+    The focus of development was the simple usability and adaptibility to any setting that requires higher order tensors or decompositions thereof.
+  doc_url: https://www.libxerus.org/
+  dev_url: https://git.hemio.de/xerus/xerus
+
+extra:
+  recipe-maintainers:
+    - trunschk
