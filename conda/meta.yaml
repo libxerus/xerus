@@ -1,6 +1,6 @@
 {% set name = "Xerus" %}
 {% set version = "4.0.1" %}
-{% set branch = "pybind11" %}
+{% set branch = "v4.0.1_conda" %}
 
 package:
   name: {{ name|lower }}
