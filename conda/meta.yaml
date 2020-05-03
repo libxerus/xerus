@@ -9,35 +9,43 @@ package:
 source:
   - git_url: https://github.com/libxerus/xerus.git
     git_tag: {{ branch }}
-    # git_depth: 1  # perform shallow clone
     folder: xerus
 
 build:
-  skip: true  # [py<34 or win]
+  number: 1
+  skip: true       # [py<34 or win]
 
 requirements:
   build:
     - {{ compiler('cxx') }}
     - make
+    - pip >=18.1
+  host:
+    - python
+    - numpy
     - openblas
     - suitesparse
     - lapack
-    - openmp
-    - boost >=1.69.0
-    - python
-    - numpy {{ numpy }}
+    - boost-cpp >=1.69.0  # boost-cpp: boost without python
+    - llvm-openmp  # [osx]
+    - libgomp      # [linux]
     #- gdb           # bfd
     #- backward-cpp  # option for better python-like backtraces
   run:
-    - openblas
-    - suitesparse
-    - lapack
-    - openmp
-    - boost >=1.69.0
-    - python
-    - numpy {{ numpy }}
-    #- gdb           # bfd
-    #- backward-cpp  # option for better python-like backtraces
+    - {{ pin_compatible('python', max_pin='x.x') }}
+    - {{ pin_compatible('numpy') }}
+    - {{ pin_compatible('openblas', max_pin='x.x') }}
+    - {{ pin_compatible('suitesparse', max_pin='x.x') }}
+    - {{ pin_compatible('lapack') }}
+    - {{ pin_compatible('boost-cpp', max_pin='x.x.x') }}
+    - {{ pin_compatible('llvm-openmp') }}  # [osx]
+    - {{ pin_compatible('libgomp') }}      # [linux]
+
+test:
+  files:
+    - VERSION
+  source_files:
+    - xerus/src/pyTests
 
 about:
   home: https://git.hemio.de/xerus/xerus.git

@@ -23,13 +23,13 @@ LAPACK_LIBRARIES = -llapacke -llapack     # Standard Lapack + Lapacke libraries
 SUITESPARSE = -lcholmod -lspqr
 BOOST_LIBS = -lboost_filesystem
 
-OTHER += -I${CONDA_PREFIX}/include -I${CONDA_PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
-OTHER += -L${CONDA_PREFIX}/lib
+OTHER += -I${PREFIX}/include -I${PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
+OTHER += -L${PREFIX}/lib
 EOF
 
-ln -s ${CONDA_PREFIX}/include/ ${CONDA_PREFIX}/include/suitesparse
-make python3
-python3 setup.py install --prefix=${PREFIX}
+ln -s ${PREFIX}/include/ ${PREFIX}/include/suitesparse
+make python
+${PYTHON} -m pip install . --no-deps -vv
 
 # INCLUDE_PATH="${PREFIX}/include"
 # mkdir -p ${INCLUDE_PATH}
