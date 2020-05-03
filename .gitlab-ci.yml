@@ -1,12 +1,12 @@
 stages:
-- build_homepage
-- build_gcc_nocheck
-- test_gcc_nocheck
-- code_coverage
-- build_python
-# - test_python
-- build_clang
-- test_clang
+  - build_homepage
+  - build_gcc_nocheck
+  - test_gcc_nocheck
+  - build_clang
+  - test_clang
+  - code_coverage
+  - build_python
+  - test_python
 
 job_build_homepage:
   stage: build_homepage
@@ -16,9 +16,10 @@ job_build_homepage:
     - master
   allow_failure: true
 
-job_make_gcc_nocheck:
+job_build_gcc_nocheck:
   stage: build_gcc_nocheck
   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.nocheck config.mk; make XerusTest_static"
+  when: always
   artifacts:
     expire_in: 1h30min
     paths:
@@ -27,34 +28,11 @@ job_make_gcc_nocheck:
 job_test_gcc_nocheck:
   stage: test_gcc_nocheck
   script: "echo $CI_COMMIT_SHA; ./XerusTest_static all"
+  when: on_success
   dependencies:
-    - job_make_gcc_nocheck
+    - job_build_gcc_nocheck
 
-
-job_code_coverage:
-  stage: code_coverage
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.cc config.mk; mkdir -p build; make test &> build/build_output.txt || { tail -n 500 build/build_output.txt && readelf -S XerusTest_static && objdump -s -j .cc_loc XerusTest_static && false; }; tail -n 500 build/build_output.txt"
-  when: always
-  only:
-    - master
-  artifacts:
-    expire_in: 3h
-    paths:
-      - build/build_output.txt
-
-job_build_python:
-  stage: build_python
-  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make python"
-  when: always
-  variables:
-    GIT_SUBMODULE_STRATEGY: normal
-
-# job_test_python:
-#   stage: test_python
-#   script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make test_python3"
-#   when: always
-
-job_make_clang:
+job_build_clang:
   stage: build_clang
   script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.clang config.mk; make XerusTest_static"
   when: always
@@ -66,6 +44,33 @@ job_make_clang:
 job_test_clang:
   stage: test_clang
   script: "echo $CI_COMMIT_SHA; ./XerusTest_static all"
+  when: on_success
   dependencies:
-    - job_make_clang
+    - job_build_clang
 
+job_code_coverage:
+  stage: code_coverage
+  script: "clang++ --version; cp .gitlab-ci-configs/.config.mk.ci.cc config.mk; mkdir -p build; make test &> build/build_output.txt || { tail -n 500 build/build_output.txt && readelf -S XerusTest_static && objdump -s -j .cc_loc XerusTest_static && false; }; tail -n 500 build/build_output.txt"
+  when: on_success
+  artifacts:
+    expire_in: 3h
+    paths:
+      - build/build_output.txt
+
+job_build_python:
+  stage: build_python
+  script: "g++ --version; cp .gitlab-ci-configs/.config.mk.ci.gcc.python config.mk; make python"
+  when: always
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+  artifacts:
+    expire_in: 1h30min
+    paths:
+      - xerus
+
+job_test_python:
+  stage: test_python
+  script: 'python3 -c "import xerus; assert xerus.__version__ == \"$(cat VERSION)\""'
+  when: on_success
+  dependencies:
+    - job_build_python

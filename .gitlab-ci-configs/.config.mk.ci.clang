@@ -4,8 +4,6 @@
 CXX = clang++
 COMPATIBILITY = -std=c++11
 
-# STRICT_WARNINGS = TRUE
-
 DEBUG += -D XERUS_DISABLE_RUNTIME_CHECKS  # Disable all runtime checks
 
 DEBUG += -g                               # Adds debug symbols
