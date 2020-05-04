@@ -60,13 +60,13 @@ namespace xerus {
 		const size_t maxRank;
 		const bool preventZero;
 		
-		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input) : 
+		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input) :
 			input(&_input), epsilon(EPSILON), softThreshold(0.0), maxRank(std::numeric_limits<size_t>::max()), preventZero(false) { }
 			
 		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input, const double _softTreshold, const bool _preventZero = false) : 
 			input(&_input), epsilon(0.0), softThreshold(_softTreshold), maxRank(std::numeric_limits<size_t>::max()), preventZero(_preventZero) { }
 			
-		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input, const size_t _maxRank, const double _epsilon = EPSILON) : 
+		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input, const size_t _maxRank, const double _epsilon = EPSILON) :
 			input(&_input), epsilon(_epsilon), softThreshold(0.0), maxRank(_maxRank), preventZero(false) { }
 			
 		SVD(internal::IndexedTensorReadOnly<Tensor>&& _input, const size_t _maxRank, const double _epsilon, const double _softTreshold, const bool _preventZero) : 

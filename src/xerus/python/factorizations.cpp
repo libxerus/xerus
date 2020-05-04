@@ -23,49 +23,48 @@
  */
 
 
-#define NO_IMPORT_ARRAY
 #include "misc.h"
-
 using namespace internal;
 
-void expose_factorizations() {
-	class_<TensorFactorisation, boost::noncopyable>("TensorFactorisation", boost::python::no_init)
-		.def("__rlshift__", +[](TensorFactorisation &_rhs, object &_lhs){
-			std::vector<IndexedTensor<Tensor>*> tmp = extract<std::vector<IndexedTensor<Tensor>*>>(_lhs);
-			_rhs(tmp);
+void expose_factorizations(module& m) {
+	class_<TensorFactorisation>(m,"TensorFactorisation")
+		.def("__rlshift__", +[](TensorFactorisation &_rhs, std::vector<IndexedTensor<Tensor>*> &_lhs){
+			_rhs(_lhs);
 		})
 	;
-	class_<SVD, bases<TensorFactorisation>, boost::noncopyable>("SVD_temporary", boost::python::no_init);
-	def("SVD", +[](IndexedTensor<Tensor> &_rhs, size_t _maxRank, double _eps)->TensorFactorisation*{
+	class_<SVD, TensorFactorisation>(m,"SVD_temporary")
+		.def_readonly("input", &SVD::input)
+		.def_readonly("maxRank", &SVD::maxRank)
+		.def_readonly("epsilon", &SVD::epsilon)
+	;
+	m.def("SVD", +[](IndexedTensor<Tensor> &_rhs, size_t _maxRank, double _eps)->TensorFactorisation*{
 		return new SVD(std::move(_rhs), _maxRank, _eps);
-	}, return_value_policy<manage_new_object,  // result is treated as a new object
-			with_custodian_and_ward_postcall<0,1>>(), // but the argument will not be destroyed before the result is destroyed
-		(arg("source"), arg("maxRank")=std::numeric_limits<size_t>::max(), arg("eps")=EPSILON)
+	}, keep_alive<0,1>(), return_value_policy::take_ownership, // result is treated as a new object
+															   // but the argument will not be destroyed before the result is destroyed
+		arg("source"), arg("maxRank")=std::numeric_limits<size_t>::max(), arg("eps")=EPSILON
 	);
 
-
-	class_<QR, bases<TensorFactorisation>, boost::noncopyable>("QR_temporary", boost::python::no_init);
-	def("QR", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
+	class_<QR, TensorFactorisation>(m,"QR_temporary").def_readonly("input", &QR::input);
+	m.def("QR", +[](IndexedTensor<Tensor>& _rhs)->TensorFactorisation*{
 		return new QR(std::move(_rhs));
-	}, return_value_policy<manage_new_object,  // result is treated as a new object
-	   with_custodian_and_ward_postcall<0,1>>()); // but the argument will not be destroyed before the result is destroyed
+	}, keep_alive<0,1>(), return_value_policy::take_ownership // result is treated as a new object
+	);                                        // but the argument will not be destroyed before the result is destroyed
 
-	class_<RQ, bases<TensorFactorisation>, boost::noncopyable>("RQ_temporary", boost::python::no_init);
-	def("RQ", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
+	class_<RQ, TensorFactorisation>(m,"RQ_temporary").def_readonly("input", &RQ::input);
+	m.def("RQ", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
 		return new RQ(std::move(_rhs));
-	}, return_value_policy<manage_new_object,  // result is treated as a new object
-	   with_custodian_and_ward_postcall<0,1>>()); // but the argument will not be destroyed before the result is destroyed
+	}, keep_alive<0,1>(), return_value_policy::take_ownership // result is treated as a new object
+	);	 	 	 	 	 	 	 	 	 	  // but the argument will not be destroyed before the result is destroyed
 
-	class_<QC, bases<TensorFactorisation>, boost::noncopyable>("QC_temporary", boost::python::no_init);
-	def("QC", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
+	class_<QC, TensorFactorisation>(m,"QC_temporary").def_readonly("input", &QC::input);
+	m.def("QC", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
 		return new QC(std::move(_rhs));
-	}, return_value_policy<manage_new_object,  // result is treated as a new object
-	   with_custodian_and_ward_postcall<0,1>>()); // but the argument will not be destroyed before the result is destroyed
+	}, keep_alive<0,1>(), return_value_policy::take_ownership // result is treated as a new object
+	);																				// but the argument will not be destroyed before the result is destroyed
 
-	class_<CQ, bases<TensorFactorisation>, boost::noncopyable>("CQ_temporary", boost::python::no_init);
-	def("CQ", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
+	class_<CQ, TensorFactorisation>(m,"CQ_temporary").def_readonly("input", &CQ::input);
+	m.def("CQ", +[](IndexedTensor<Tensor> &_rhs)->TensorFactorisation*{
 		return new CQ(std::move(_rhs));
-	}, return_value_policy<manage_new_object,  // result is treated as a new object
-	   with_custodian_and_ward_postcall<0,1>>()); // but the argument will not be destroyed before the result is destroyed
-
+	}, keep_alive<0,1>(), return_value_policy::take_ownership // result is treated as a new object
+	);	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 	 // but the argument will not be destroyed before the result is destroyed
 }

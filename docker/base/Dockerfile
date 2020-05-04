@@ -1,10 +1,10 @@
-FROM phusion/baseimage:0.9.22
+FROM phusion/baseimage:0.11
 USER root
 WORKDIR "/tmp/"
 
 # Get Ubuntu updates
-RUN apt-get -qq update && \
-    apt-get -y --with-new-pkgs -o Dpkg::Options::="--force-confold" upgrade
+RUN apt-get update && \
+    apt-get upgrade -y -o Dpkg::Options::="--force-confold"
 
 # Set locale environment
 RUN apt-get -y install locales sudo && \
@@ -13,10 +13,6 @@ RUN apt-get -y install locales sudo && \
 ENV LC_ALL=C.UTF-8 \
     LANG=C.UTF-8 \
     LANGUAGE=C.UTF-8
-
-# Turn off forwarding of syslog messages to stdout
-# https://github.com/phusion/baseimage-docker/issues/186
-RUN touch /etc/service/syslog-forwarder/down
 
 # Non-Python utilities and libraries
 RUN apt-get -y install \
@@ -32,7 +28,12 @@ RUN apt-get -y install \
     libopenblas-dev \
     libiberty-dev \
     binutils-dev \
-    zlib1g-dev
+    zlib1g-dev \
+    libdpkg-perl
+
+# Check Python versions
+RUN python  -c'from __future__ import print_function; import sys; version = "{0}.{1}".format(*sys.version_info); print("python2-version:", version)'
+RUN python3 -c'import sys; version = "{0}.{1}".format(*sys.version_info); print("python3-version:", version)'
 
 # Install Python2 based environment
 RUN apt-get -y install \

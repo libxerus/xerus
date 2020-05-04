@@ -24,35 +24,44 @@
 
 #include "misc.h"
 
-// TODO get_copy() wrapper in python correct manner
-BOOST_PYTHON_MODULE(xerus) {
-	using namespace xerus;
 
-	import_array(); // for numpy
-
-	bool show_user_defined = true;
-	bool show_signatures = false;
-	docstring_options doc_options(show_user_defined, show_signatures);
+PYBIND11_MODULE(xerus, m) {
+	m.doc() = "\
+The `xerus` library is a general purpose library for numerical calculations with higher order tensors, Tensor-Train Decompositions / Matrix Product States and general Tensor Networks.\n\
+The focus of development was the simple usability and adaptibility to any setting that requires higher order tensors or decompositions thereof.\n\
+\n\
+The key features include:\n\
+* Modern code and concepts incorporating many features of the `C++11` standard.\n\
+* Full python bindings with very similar syntax for easy transitions from and to c++.\n\
+* Calculation with tensors of arbitrary orders using an intuitive Einstein-like notation `A(i,j) = B(i,k,l) * C(k,j,l);`.\n\
+* Full implementation of the Tensor-Train decompositions (MPS) with all neccessary capabilities (including Algorithms like ALS, ADF and CG).\n\
+* Lazy evaluation of (multiple) tensor contractions featuring heuristics to automatically find efficient contraction orders.\n\
+* Direct integration of the `blas` and `lapack`, as high performance linear algebra backends.\n\
+* Fast sparse tensor calculation by usage of the `suiteSparse` sparse matrix capabilities.\n\
+* Capabilites to handle arbitrary Tensor Networks.\n\
+";
 
 	// xerus version
-	scope().attr("VERSION_MAJOR") = VERSION_MAJOR;
-	scope().attr("VERSION_MINOR") = VERSION_MINOR;
-	scope().attr("VERSION_REVISION") = VERSION_REVISION;
-	scope().attr("VERSION_COMMIT") = VERSION_COMMIT;
+	{
+		std::ostringstream tmp;
+		tmp << VERSION_MAJOR << "." << VERSION_MINOR << "." << VERSION_REVISION;
+		m.attr("__version__") = tmp.str();
+	}
+	m.attr("VERSION_MAJOR") = VERSION_MAJOR;
+	m.attr("VERSION_MINOR") = VERSION_MINOR;
+	m.attr("VERSION_REVISION") = VERSION_REVISION;
+	m.attr("VERSION_COMMIT") = VERSION_COMMIT;
 
-	VECTOR_TO_PY(size_t, "IntegerVector");
-	VECTOR_TO_PY(double, "DoubleVector");
+	expose_indexedTensors(m);
+	expose_factorizations(m);
 
-	expose_indexedTensors();
-	expose_factorizations();
-	expose_tensor();
-	expose_tensorNetwork();
-	expose_ttnetwork();
-	expose_htnetwork();
-	expose_blocktt();
+	expose_tensor(m);
+	expose_tensorNetwork(m);
+	expose_ttnetwork(m);
+	expose_htnetwork(m);
 
-	expose_leastSquaresAlgorithms();
-	expose_recoveryAlgorithms();
+	expose_leastSquaresAlgorithms(m);
+	expose_recoveryAlgorithms(m);
 
-	expose_misc();
+	expose_misc(m);
 }

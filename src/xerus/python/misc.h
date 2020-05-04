@@ -23,62 +23,40 @@
  */
 
 #pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsuggest-override"
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wparentheses"
-#pragma GCC diagnostic ignored "-Wuseless-cast"
-#pragma GCC diagnostic ignored "-Wconversion"
-#pragma GCC diagnostic ignored "-Wctor-dtor-privacy"
+#pragma GCC diagnostic ignored "-Wundef"
 #pragma GCC diagnostic ignored "-Wfloat-equal"
 #pragma GCC diagnostic ignored "-Wshadow"
-#pragma GCC diagnostic ignored "-Wfloat-conversion"
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#pragma GCC diagnostic ignored "-Wundef"
-#pragma GCC diagnostic ignored "-Wcast-qual"
-#pragma GCC diagnostic ignored "-Wswitch-default"
-#include <boost/function.hpp>
-#include <boost/python.hpp>
-#include <boost/python/stl_iterator.hpp>
-#include <boost/python/call.hpp>
-#pragma GCC diagnostic pop
-#define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wuseless-cast"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
-#pragma GCC diagnostic ignored "-Wcast-qual"
-#pragma GCC diagnostic ignored "-Wunused-function"
-#pragma GCC diagnostic ignored "-Wpedantic"
-#define PY_ARRAY_UNIQUE_SYMBOL XERUS_ARRAY_API
-#include <numpy/ndarrayobject.h>
-#pragma GCC diagnostic pop
+#pragma GCC diagnostic ignored "-Wuseless-cast"
+#include <pybind11/pybind11.h>
+#include <pybind11/operators.h>
+#include <pybind11/stl.h>
+#include <pybind11/functional.h>
+#include <pybind11/eval.h>
+// #include <pybind11/numpy.h>
+// #undef NDEBUG
 #include "xerus.h"
-#include "xerus/blockTT.h"
-#include "xerus/misc/internal.h"
+#include "xerus/misc/internal.h"  // REQUIRE
+#pragma GCC diagnostic pop
 
-using namespace boost::python;
+
+using namespace pybind11;
 using namespace xerus;
 
 
 #define parametersDocstr "\n\nParameters\n----------\n"
-#define	returnsDocstr "\n\nReturns\n-------\n"
+#define returnsDocstr "\n\nReturns\n-------\n"
 
-#define VECTOR_TO_PY(type, name) class_<std::vector<type>, boost::noncopyable>(name, no_init); \
-	custom_vector_from_seq<type>(); \
-	to_python_converter<std::vector<type>, custom_vector_to_list<type>>(); void(0)
 
-#include "vectorAndPair.h"
+void expose_indexedTensors(module& m);
+void expose_factorizations(module& m);
 
-void variable_argument_member_to_tuple_wrapper(const std::string &_name, const std::string &_tmpName = "new_fn");
+void expose_tensor(module& m);
+void expose_tensorNetwork(module& m);
+void expose_ttnetwork(module& m);
+void expose_htnetwork(module& m);
 
-void expose_tensor();
-void expose_factorizations();
-void expose_indexedTensors();
-void expose_tensorNetwork();
-void expose_ttnetwork();
-void expose_htnetwork();
-void expose_blocktt();
+void expose_leastSquaresAlgorithms(module& m);
+void expose_recoveryAlgorithms(module& m);
 
-void expose_leastSquaresAlgorithms();
-void expose_recoveryAlgorithms();
-
-void expose_misc();
+void expose_misc(module& m);

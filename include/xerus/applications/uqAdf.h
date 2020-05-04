@@ -50,7 +50,17 @@ namespace xerus { namespace uq {
 	 */
     TTTensor uq_ra_adf(const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<size_t>& _dimensions, const double _targetEps = 1e-8, const size_t _maxItr = 0);
 
-	
+	/**
+	 * @brief Rank adaptive ADF to calculate the UQ solution for given measurements.
+	 * @param _x Initial value.
+	 * @param _positions The positions of the measurements.
+	 * @param _solutions The measured solutions corresponding to the @a _positions.
+	 * @param _dimensions The dimensions of the final solution tensor.
+	 * @param _targetEps TODO describe effect
+	 * @param _maxItr Maximal number of iterations to perform.
+	 */
+    TTTensor uq_ra_adf(const TTTensor& _x, const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<size_t>& _dimensions, const double _targetEps = 1e-8, const size_t _maxItr = 0);
+
 	/**
 	 * @brief Rank adaptive ADF to calculate the UQ solution for given weighted measurements.
 	 * @param _positions The positions of the measurements.
@@ -63,6 +73,5 @@ namespace xerus { namespace uq {
     TTTensor uq_ra_adf(const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<double>& _weights, const std::vector<size_t>& _dimensions, const double _targetEps = 1e-8, const size_t _maxItr = 0);
 
 	
-	// TODO How is this different to the inplace variant? Also very confusing that it changes _x inplace AND returns it.
-    TTTensor uq_ra_adf_iv(TTTensor& _x, const UQMeasurementSet& _measurements, const PolynomBasis _basisType, const double _targetEps = 1e-8, const size_t _maxItr = 0);
+    TTTensor uq_ra_adf(const TTTensor& _x, const UQMeasurementSet& _measurements, const PolynomBasis _basisType, const double _targetEps = 1e-8, const size_t _maxItr = 0);
 }}

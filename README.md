@@ -28,10 +28,14 @@ Test whether everything works correctly with
 
 build (and optionally install) the library with
 > make all -j4
-
 > sudo make install
 
-and you should be ready to use the library. For more details see <a href="https://www.libxerus.org/building_xerus/">the "Building Xerus" page in the documentation</a>.
+and you should be ready to use the library.
+To install the python bindings run
+> make python3
+> pip install .
+
+For more details see <a href="https://www.libxerus.org/building_xerus/">the "Building Xerus" page in the documentation</a>.
 
 
 # Issues #

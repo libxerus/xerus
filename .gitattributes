@@ -1,0 +1,2 @@
+*.py  filter=tabspace
+*.cpp  filter=tabspace

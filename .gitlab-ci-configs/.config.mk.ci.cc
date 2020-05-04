@@ -6,11 +6,10 @@ COMPATIBILITY = -std=c++14
 
 DEBUG_OPTIMIZATION = TRUE
 
-ACTIVATE_CODE_COVERAGE = TRUE                 # Enable coverage tests
-BROCKEN_CI = TRUE			# Enable workaround for brocken CI runner
-DEBUG += -D _GLIBCXX_ASSERTIONS        # Activate GLIBCXX assertions
-
-DEBUG += -g                # Adds debug symbols
+ACTIVATE_CODE_COVERAGE = TRUE       # Enable coverage tests
+BROCKEN_CI = TRUE                   # Enable workaround for brocken CI runner
+DEBUG += -D _GLIBCXX_ASSERTIONS     # Activate GLIBCXX assertions
+DEBUG += -g                         # Adds debug symbols
 
 #=================================================================================================
 # External libraries

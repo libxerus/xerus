@@ -529,11 +529,11 @@ namespace xerus {
         void draw(const std::string& _filename) const;
     };
 
-    TensorNetwork operator*(TensorNetwork &_lhs, value_t _factor);
+    TensorNetwork operator*(const TensorNetwork &_lhs, const value_t _factor);
 
-    TensorNetwork operator*(value_t _factor, TensorNetwork &_rhs);
+    TensorNetwork operator*(const value_t _factor, const TensorNetwork &_rhs);
 
-    TensorNetwork operator/(TensorNetwork &_lhs, value_t _factor);
+    TensorNetwork operator/(const TensorNetwork &_lhs, const value_t _factor);
 
     /**
      * @brief Calculates the frobenious norm of the given TensorNetwork.

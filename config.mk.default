@@ -14,8 +14,8 @@ CXX = g++
 # pytest executable(s). If you installed these system-wide you likely don't need to change anything.
 PYTHON2_CONFIG = `python2-config --cflags --ldflags`
 PYTHON3_CONFIG = `python3-config --cflags --ldflags`
-PYTEST2 = pytest2
-PYTEST3 = pytest3
+PYTEST2 = python2 -m pytest
+PYTEST3 = python3 -m pytest
 
 #=================================================================================================
 # C++ Version
@@ -139,10 +139,6 @@ BOOST_LIBS = -lboost_filesystem -lboost_system
 # (optional) Uncomment if needed, iterative eigenvalue solver ARPACK-ng, see https://github.com/opencollab/arpack-ng
 # ARPACK_LIBRARIES = -larpack
 # OTHER += -DARPACK_LIBRARIES
-
-# Uncomment or add the appropriate boost python library
-BOOST_PYTHON2 = -lboost_python-py27
-BOOST_PYTHON3 = -lboost_python-py35
 
 # Custom include paths
 # OTHER += -I /path/to/include

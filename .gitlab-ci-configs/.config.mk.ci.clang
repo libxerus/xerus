@@ -1,29 +1,18 @@
 #=================================================================================================
 # Compiler Options
 #=================================================================================================
-CXX = clang++-3.9
+CXX = clang++
 COMPATIBILITY = -std=c++11
 
- DEBUG += -g                # Adds debug symbols
+DEBUG += -D XERUS_DISABLE_RUNTIME_CHECKS  # Disable all runtime checks
 
-LOGGING += -D XERUS_LOG_INFO                     # Information that is not linked to any unexpected behaviour but might 
+DEBUG += -g                               # Adds debug symbols
+LOGGING += -D XERUS_LOG_INFO
 
 #=================================================================================================
 # External libraries
 #=================================================================================================
-STRICT_WARNINGS = TRUE
-
-# Uncomment or add the appropriate blas libraries 
-BLAS_LIBRARIES = -lopenblas -lgfortran                    # Openblas, serial
-
-# Uncomment or add the appropriate lapack libraries 
-LAPACK_LIBRARIES = -llapacke -llapack                     # Standard Lapack + Lapacke libraries
-
-# Uncomment or add the appropriate CXSparse library
+BLAS_LIBRARIES = -lopenblas -lgfortran    # Openblas, serial
+LAPACK_LIBRARIES = -llapacke -llapack     # Standard Lapack + Lapacke libraries
 SUITESPARSE = -lcholmod -lspqr
 BOOST_LIBS = -lboost_filesystem
-
-
-# custom include paths
-# OTHER += -I /path/to/include
-

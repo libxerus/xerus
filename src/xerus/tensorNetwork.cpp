@@ -1426,19 +1426,19 @@ namespace xerus {
 
 
 
-	TensorNetwork operator*(TensorNetwork &_lhs, value_t _factor) {
+	TensorNetwork operator*(const TensorNetwork &_lhs, const value_t _factor) {
 		TensorNetwork res(*_lhs.get_copy());
 		res *= _factor;
 		return res;
 	}
 
-	TensorNetwork operator*(value_t _factor, TensorNetwork &_rhs) {
+	TensorNetwork operator*(const value_t _factor, const TensorNetwork &_rhs) {
 		TensorNetwork res(*_rhs.get_copy());
 		res *= _factor;
 		return res;
 	}
 
-	TensorNetwork operator/(TensorNetwork &_lhs, value_t _factor) {
+	TensorNetwork operator/(const TensorNetwork &_lhs, const value_t _factor) {
 		TensorNetwork res(*_lhs.get_copy());
 		res *= 1.0/_factor;
 		return res;

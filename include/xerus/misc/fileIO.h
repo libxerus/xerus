@@ -110,7 +110,7 @@ namespace xerus { namespace misc {
     T deserialize(const std::string& _bytes) {
         T obj;
         std::string header = _bytes.substr(0, _bytes.find("\n"));
-        XERUS_REQUIRE(header == std::string("Xerus ") + misc::demangle_cxa(typeid(T).name()) + " serialized object.", "Invalid binary input. DBG: " << header);
+        XERUS_REQUIRE(header == std::string("Xerus ") + misc::demangle_cxa(typeid(T).name()) + " serialized object.", "Invalid binary input. \nExpected: \"" << std::string("Xerus ") + misc::demangle_cxa(typeid(T).name()) + " serialized object.\"\nGot: \"" << header << "\"");
         std::stringstream stream(_bytes.substr(_bytes.find("\n")+1));  // +1 because of the last \n
         XERUS_REQUIRE(stream, "Unexpected end of stream in load_from_file().");
         stream_reader(stream, obj, FileFormat::BINARY);

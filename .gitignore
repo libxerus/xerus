@@ -1,39 +1,15 @@
-# Ignore everything
-*
-
-# But not these files...
-!.gitignore
-!*.h
-!*.hpp
-!*.hxx
-
-!*.c
-!*.cpp
-!*.cxx
-
-!*.mk
-!Makefile
-
-!Dockerfile
-
-!*.sh
-
-!*.rb
-!*.py
-!.config.mk.*
-
-!*.md
-!*.xml
-!*.dox
-!*.css
-!*.js
-!*.yml
-
-# ...even if they are in subdirectories
-!*/
-
-# However we really want to ignore
-lapacke/*
-build/*
-doc/html/*
+.cache
+__pycache__
+*.sw[pon]
+*.np[yz]
+*.xrs
+*.so
+lapacke
+build
+doc/html
+doc/findDoxytag
+doc/parseDoxytags
+doc/xerus.tagfile
+doc/xerus.tags
 config.mk
+XerusTest

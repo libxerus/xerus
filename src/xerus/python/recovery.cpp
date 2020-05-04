@@ -1,95 +1,47 @@
-// Xerus - A General Purpose Tensor Library
-// Copyright (C) 2014-2019 Benjamin Huber and Sebastian Wolf.
-//
-// Xerus is free software: you can redistribute it and/or modify
-// it under the terms of the GNU Affero General Public License as published
-// by the Free Software Foundation, either version 3 of the License,
-// or (at your option) any later version.
-//
-// Xerus is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU Affero General Public License for more details.
-//
-// You should have received a copy of the GNU Affero General Public License
-// along with Xerus. If not, see <http://www.gnu.org/licenses/>.
-//
-// For further information on Xerus visit https://libXerus.org
-// or contact us at contact@libXerus.org.
-
-/**
- * @file
- * @brief Definition of the python bindings of our recovery and completion algorithms.
- */
-
-
-#define NO_IMPORT_ARRAY
 #include "misc.h"
-// using namespace uq;
 
-void expose_recoveryAlgorithms() {
+void expose_recoveryAlgorithms(module& m) {
 	// ------------------------------------------------------------- measurements
 
-	class_<SinglePointMeasurementSet>("SinglePointMeasurementSet")
+	class_<SinglePointMeasurementSet>(m, "SinglePointMeasurementSet")
+		.def(init<>(), "constructs an empty measurement set")
 		.def(init<const SinglePointMeasurementSet&>())
-		.def("get_position", +[](SinglePointMeasurementSet &_this, size_t _i){
-			return _this.positions[_i];
-		})
-		.def("set_position", +[](SinglePointMeasurementSet &_this, size_t _i, std::vector<size_t> _pos){
-			_this.positions[_i] = _pos;
-		})
-		.def("get_measuredValue", +[](SinglePointMeasurementSet &_this, size_t _i){
-			return _this.measuredValues[_i];
-		})
-		.def("set_measuredValue", +[](SinglePointMeasurementSet &_this, size_t _i, value_t _val){
-			_this.measuredValues[_i] = _val;
-		})
-//         .def("add", &SinglePointMeasurementSet::add)
-		.def("add", +[](SinglePointMeasurementSet& _self, const std::vector<size_t>& _position, const value_t _measuredValue) {
-				_self.add(_position, _measuredValue);
-			})
-		.def("add", +[](SinglePointMeasurementSet& _self, const std::vector<size_t>& _position, const value_t _measuredValue, const value_t _weight) {
-				_self.add(_position, _measuredValue, _weight);
-			})
+		.def_readwrite("positions", &SinglePointMeasurementSet::positions)
+		.def_readwrite("measuredValues", &SinglePointMeasurementSet::measuredValues)
+		/* .def("add", overload_cast<const std::vector<size_t>&, const value_t>(&SinglePointMeasurementSet::add)) */
+		.def("add", static_cast<void (SinglePointMeasurementSet::*)(const std::vector<size_t>&, const value_t)>(&SinglePointMeasurementSet::add))
+		/* .def("add", overload_cast<const std::vector<size_t>&, const value_t, const value_t>(&SinglePointMeasurementSet::add)) */
+		.def("add", static_cast<void (SinglePointMeasurementSet::*)(const std::vector<size_t>&, const value_t, const value_t)>(&SinglePointMeasurementSet::add))
 		.def("size", &SinglePointMeasurementSet::size)
 		.def("order", &SinglePointMeasurementSet::order)
 		.def("norm_2", &SinglePointMeasurementSet::norm_2)
-		.def("sort", &SinglePointMeasurementSet::sort, arg("positionsOnly")=false)
-		.def("measure", static_cast<void (SinglePointMeasurementSet::*)(const Tensor &)>(&SinglePointMeasurementSet::measure), arg("solution"))
-		.def("measure", static_cast<void (SinglePointMeasurementSet::*)(const TensorNetwork &)>(&SinglePointMeasurementSet::measure), arg("solution"))
-		.def("measure", +[](SinglePointMeasurementSet &_this, PyObject *_f) {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							_this.measure([&_f](const std::vector<size_t> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
-		.def("test", static_cast<double (SinglePointMeasurementSet::*)(const Tensor &) const>(&SinglePointMeasurementSet::test), arg("solution"))
-		.def("test", static_cast<double (SinglePointMeasurementSet::*)(const TensorNetwork &) const>(&SinglePointMeasurementSet::test), arg("solution"))
-		.def("test", +[](SinglePointMeasurementSet &_this, PyObject *_f)->double {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							return _this.test([&_f](const std::vector<size_t> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
+		.def("sort", &SinglePointMeasurementSet::sort)
+		/* .def("measure", overload_cast<const Tensor &>(&SinglePointMeasurementSet::measure), arg("solution")) */
+		.def("measure", static_cast<void (SinglePointMeasurementSet::*)(const Tensor&)>(&SinglePointMeasurementSet::measure), arg("solution"))
+		/* .def("measure", overload_cast<const TensorNetwork &>(&SinglePointMeasurementSet::measure), arg("solution")) */
+		.def("measure", static_cast<void (SinglePointMeasurementSet::*)(const TensorNetwork&)>(&SinglePointMeasurementSet::measure), arg("solution"))
+		.def("measure", +[](SinglePointMeasurementSet &_this, const std::function<double(const std::vector<size_t>)> _f) {
+			_this.measure(_f);
+		})
+		/* .def("test", overload_cast<const Tensor &>(&SinglePointMeasurementSet::test, const_), arg("solution")) */
+		.def("test", static_cast<double (SinglePointMeasurementSet::*)(const Tensor&) const>(&SinglePointMeasurementSet::test), arg("solution"))
+		/* .def("test", overload_cast<const TensorNetwork &>(&SinglePointMeasurementSet::test, const_), arg("solution")) */
+		.def("test", static_cast<double (SinglePointMeasurementSet::*)(const TensorNetwork&) const>(&SinglePointMeasurementSet::test), arg("solution"))
+		.def("test", +[](SinglePointMeasurementSet &_this, const std::function<double(const std::vector<size_t>)> _f) -> double {
+			return _this.test(_f);
+		})
 
-
-		.def("random",static_cast<SinglePointMeasurementSet (*)(size_t, const std::vector<size_t>&)>(&SinglePointMeasurementSet::random))
-		.def("random",static_cast<SinglePointMeasurementSet (*)(size_t, const Tensor&)>(&SinglePointMeasurementSet::random))
-		.def("random",static_cast<SinglePointMeasurementSet (*)(size_t, const TensorNetwork&)>(&SinglePointMeasurementSet::random))
-		.def("random",+[](size_t n, const std::vector<size_t> &dim, PyObject *_f) {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							return SinglePointMeasurementSet::random(n, dim, [&_f](const std::vector<size_t> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
-			 .staticmethod("random")
+		.def_static("random",static_cast<SinglePointMeasurementSet (*)(size_t, const std::vector<size_t>&)>(&SinglePointMeasurementSet::random))
+		.def_static("random",static_cast<SinglePointMeasurementSet (*)(size_t, const Tensor&)>(&SinglePointMeasurementSet::random))
+		.def_static("random",static_cast<SinglePointMeasurementSet (*)(size_t, const TensorNetwork&)>(&SinglePointMeasurementSet::random))
+		.def_static("random",+[](size_t n, const std::vector<size_t> &dim, const std::function<double(const std::vector<size_t>)> _f) {
+			return SinglePointMeasurementSet::random(n, dim, _f);
+		})
 	;
-	def("IHT", &IHT, (arg("x"), arg("measurements"), arg("perfData")=NoPerfData) );
+	m.def("IHT", &IHT, arg("x"), arg("measurements"), arg("perfData")=NoPerfData);
 
-
-	VECTOR_TO_PY(Tensor, "TensorVector");
-
-	class_<RankOneMeasurementSet>("RankOneMeasurementSet")
+	class_<RankOneMeasurementSet>(m, "RankOneMeasurementSet")
+		.def(init<>(), "constructs an empty measurement set")
 		.def(init<const RankOneMeasurementSet&>())
 		.def("get_position", +[](RankOneMeasurementSet &_this, size_t _i){
 			return _this.positions[_i];
@@ -104,49 +56,43 @@ void expose_recoveryAlgorithms() {
 			_this.measuredValues[_i] = _val;
 		})
 		.def("add", +[](RankOneMeasurementSet& _self, const std::vector<Tensor>& _position, const value_t _measuredValue) {
-				_self.add(_position, _measuredValue);
-			})
+			_self.add(_position, _measuredValue);
+		})
 		.def("add", +[](RankOneMeasurementSet& _self, const std::vector<Tensor>& _position, const value_t _measuredValue, const value_t _weight) {
-				_self.add(_position, _measuredValue, _weight);
-			})
+			_self.add(_position, _measuredValue, _weight);
+		})
 		.def("size", &RankOneMeasurementSet::size)
 		.def("order", &RankOneMeasurementSet::order)
 		.def("norm_2", &RankOneMeasurementSet::norm_2)
-		.def("sort", &RankOneMeasurementSet::sort, arg("positionsOnly")=false)
+		.def("sort", &RankOneMeasurementSet::sort)
 		.def("normalize", &RankOneMeasurementSet::normalize)
-		.def("measure", static_cast<void (RankOneMeasurementSet::*)(const Tensor &)>(&RankOneMeasurementSet::measure), arg("solution"))
-		.def("measure", static_cast<void (RankOneMeasurementSet::*)(const TensorNetwork &)>(&RankOneMeasurementSet::measure), arg("solution"))
-		.def("measure", +[](RankOneMeasurementSet &_this, PyObject *_f) {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							_this.measure([&_f](const std::vector<Tensor> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
-		.def("test", static_cast<double (RankOneMeasurementSet::*)(const Tensor &) const>(&RankOneMeasurementSet::test), arg("solution"))
-		.def("test", static_cast<double (RankOneMeasurementSet::*)(const TensorNetwork &) const>(&RankOneMeasurementSet::test), arg("solution"))
-		.def("test", +[](RankOneMeasurementSet &_this, PyObject *_f)->double {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							return _this.test([&_f](const std::vector<Tensor> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
+		/* .def("measure", overload_cast<const Tensor &>(&RankOneMeasurementSet::measure), arg("solution")) */
+		.def("measure", static_cast<void (RankOneMeasurementSet::*)(const Tensor&)>(&RankOneMeasurementSet::measure), arg("solution"))
+		/* .def("measure", overload_cast<const TensorNetwork &>(&RankOneMeasurementSet::measure), arg("solution")) */
+		.def("measure", static_cast<void (RankOneMeasurementSet::*)(const TensorNetwork&)>(&RankOneMeasurementSet::measure), arg("solution"))
+		.def("measure", +[](RankOneMeasurementSet &_this, const std::function<double(const std::vector<Tensor>)> _f) {
+			_this.measure(_f);
+		})
+		/* .def("test", overload_cast<const Tensor &>(&RankOneMeasurementSet::test, const_), arg("solution")) */
+		.def("test", static_cast<double (RankOneMeasurementSet::*)(const Tensor&) const>(&RankOneMeasurementSet::test), arg("solution"))
+		/* .def("test", overload_cast<const TensorNetwork &>(&RankOneMeasurementSet::test, const_), arg("solution")) */
+		.def("test", static_cast<double (RankOneMeasurementSet::*)(const TensorNetwork&) const>(&RankOneMeasurementSet::test), arg("solution"))
+		.def("test", +[](RankOneMeasurementSet &_this, const std::function<double(const std::vector<Tensor>)> _f) -> double {
+			return _this.test(_f);
+		})
 
-
-		.def("random",static_cast<RankOneMeasurementSet (*)(size_t, const std::vector<size_t>&)>(&RankOneMeasurementSet::random))
-		.def("random",static_cast<RankOneMeasurementSet (*)(size_t, const Tensor&)>(&RankOneMeasurementSet::random))
-		.def("random",static_cast<RankOneMeasurementSet (*)(size_t, const TensorNetwork&)>(&RankOneMeasurementSet::random))
-		.def("random",+[](size_t n, const std::vector<size_t> &dim, PyObject *_f) {
-							// TODO increase ref count for _f? also decrease it on overwrite?!
-							return RankOneMeasurementSet::random(n, dim, [&_f](const std::vector<Tensor> &pos)->double {
-								return call<double>(_f, pos);
-							});
-						})
-			 .staticmethod("random")
+		.def_static("random",static_cast<RankOneMeasurementSet (*)(size_t, const std::vector<size_t>&)>(&RankOneMeasurementSet::random))
+		.def_static("random",static_cast<RankOneMeasurementSet (*)(size_t, const Tensor&)>(&RankOneMeasurementSet::random))
+		.def_static("random",static_cast<RankOneMeasurementSet (*)(size_t, const TensorNetwork&)>(&RankOneMeasurementSet::random))
+		.def_static("random",+[](size_t n, const std::vector<size_t> &dim, const std::function<double(const std::vector<Tensor>)> _f) {
+			return RankOneMeasurementSet::random(n, dim, _f);
+		})
 	;
 
 	// ------------------------------------------------------------- ADF
 
-	class_<ADFVariant>("ADFVariant", init<size_t, double, double>())
+	class_<ADFVariant>(m, "ADFVariant")
+		.def(init<size_t, double, double>())
 		.def(init<ADFVariant>())
 		.def_readwrite("maxIterations", &ADFVariant::maxIterations)
 		.def_readwrite("targetResidualNorm", &ADFVariant::targetRelativeResidual)
@@ -154,60 +100,57 @@ void expose_recoveryAlgorithms() {
 
 		.def("__call__", +[](ADFVariant &_this, TTTensor& _x, const SinglePointMeasurementSet& _meas, PerformanceData& _pd){
 			return _this(_x, _meas, _pd);
-		}, (arg("x"), arg("measurements"), arg("perfData")=NoPerfData) )
+		}, arg("x"), arg("measurements"), arg("perfData")=NoPerfData)
 		.def("__call__", +[](ADFVariant &_this, TTTensor& _x, const SinglePointMeasurementSet& _meas, const std::vector<size_t>& _maxRanks, PerformanceData& _pd){
 			return _this(_x, _meas, _maxRanks, _pd);
-		}, (arg("x"), arg("measurements"), arg("maxRanks"), arg("perfData")=NoPerfData) )
+		}, arg("x"), arg("measurements"), arg("maxRanks"), arg("perfData")=NoPerfData)
 
 		.def("__call__", +[](ADFVariant &_this, TTTensor& _x, const RankOneMeasurementSet& _meas, PerformanceData& _pd){
 			return _this(_x, _meas, _pd);
-		}, (arg("x"), arg("measurements"), arg("perfData")=NoPerfData) )
+		}, arg("x"), arg("measurements"), arg("perfData")=NoPerfData)
 		.def("__call__", +[](ADFVariant &_this, TTTensor& _x, const RankOneMeasurementSet& _meas, const std::vector<size_t>& _maxRanks, PerformanceData& _pd){
 			return _this(_x, _meas, _maxRanks, _pd);
-		}, (arg("x"), arg("measurements"), arg("maxRanks"), arg("perfData")=NoPerfData) )
+		}, arg("x"), arg("measurements"), arg("maxRanks"), arg("perfData")=NoPerfData)
 	;
-	scope().attr("ADF") = object(ptr(&ADF));
+	m.attr("ADF") = ADF;
 
-	class_<uq::UQMeasurementSet>("UQMeasurementSet")
-	.def(init<const uq::UQMeasurementSet&>())
-	.def("add", &uq::UQMeasurementSet::add)
+	class_<uq::UQMeasurementSet>(m, "UQMeasurementSet")
+		.def(init<>(), "constructs an empty measurement set")
+		.def(init<const uq::UQMeasurementSet&>())
+		.def("add", &uq::UQMeasurementSet::add)
 	;
 
-	VECTOR_TO_PY(std::vector<double>, "DoubleVectorVector");
-	py_pair<std::vector<std::vector<double>>, std::vector<Tensor>>();
+	m.def("uq_ra_adf", +[](const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
+		return uq::uq_ra_adf(_measurements, _basisType, _dimensions, _targetEps, _maxItr);
+		}, arg("measurements"), arg("polynombasis"), arg("dimensions"), arg("targeteps"), arg("maxitr")
+	);
 
+	m.def("uq_ra_adf", +[](const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
+		return uq::uq_ra_adf(_positions, _solutions, _dimensions, _targetEps, _maxItr);
+		}, arg("positions"), arg("solutions"), arg("dimensions"), arg("targeteps"), arg("maxitr")
+	);
 
-	VECTOR_TO_PY(std::vector<Tensor>, "TensorVectorVector");
-	//def("uq_adf", +[](const UQMeasurementSet& _measurments, const TTTensor& _guess) {
-	//  return uq_adf(_measurments, _guess);
-	//}, ( arg("measurments"), arg("guess")) );
+	m.def("uq_ra_adf", +[](const TTTensor& _x, const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
+		return uq::uq_ra_adf(_x, _positions, _solutions, _dimensions, _targetEps, _maxItr);
+		}, arg("x"), arg("positions"), arg("solutions"), arg("dimensions"), arg("targeteps"), arg("maxitr")
+	);
 
-	def("uq_ra_adf", +[](const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
-			return uq::uq_ra_adf(_measurements, _basisType, _dimensions, _targetEps, _maxItr);
-			}, (arg("measurements"), arg("polynombasis"), arg("dimensions"), arg("targeteps"), arg("maxitr"))
-	   );
+	m.def("uq_ra_adf", +[](const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<double>& _weights, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
+		return uq::uq_ra_adf(_positions, _solutions, _weights, _dimensions, _targetEps, _maxItr);
+		}, arg("positions"), arg("solutions"), arg("weights"), arg("dimensions"), arg("targeteps"), arg("maxitr")
+	);
 
-	def("uq_ra_adf", +[](const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
-			return uq::uq_ra_adf(_positions, _solutions, _dimensions, _targetEps, _maxItr);
-			}, (arg("positions"), arg("solutions"), arg("dimensions"), arg("targeteps"), arg("maxitr"))
-	   );
+	m.def("uq_ra_adf", +[](TTTensor& _x, const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const double _targetEps, const size_t _maxItr){
+		return uq::uq_ra_adf(_x, _measurements, _basisType, _targetEps, _maxItr);
+		}, arg("initial guess"), arg("measurements"), arg("polynombasis"), arg("targeteps"), arg("maxitr")
+	);
 
-	def("uq_ra_adf", +[](const std::vector<std::vector<Tensor>>& _positions, const std::vector<Tensor>& _solutions, const std::vector<double>& _weights, const std::vector<size_t>& _dimensions, const double _targetEps, const size_t _maxItr){
-			return uq::uq_ra_adf(_positions, _solutions, _weights, _dimensions, _targetEps, _maxItr);
-			}, (arg("positions"), arg("solutions"), arg("weights"), arg("dimensions"), arg("targeteps"), arg("maxitr"))
-	   );
+	m.def("uq_tt_evaluate", +[](const TTTensor& _x, const std::vector<double>& _parameters, const uq::PolynomBasis _basisType) {
+		return uq::evaluate(_x, _parameters, _basisType);
+		}, arg("x"), arg("parameters"), arg("basisType")
+	);
 
-	def("uq_ra_adf_iv", +[](TTTensor& _x, const uq::UQMeasurementSet& _measurements, const uq::PolynomBasis _basisType, const double _targetEps, const size_t _maxItr){
-			return uq::uq_ra_adf_iv(_x, _measurements, _basisType, _targetEps, _maxItr);
-			}, (arg("initial guess"), arg("measurements"), arg("polynombasis"), arg("targeteps"), arg("maxitr"))
-	   );
-
-	def("uq_tt_evaluate", +[](const TTTensor& _x, const std::vector<double>& _parameters, const uq::PolynomBasis _basisType) {
-			return uq::evaluate(_x, _parameters, _basisType);
-			}, (arg("x"), arg("parameters"), arg("basisType"))
-	   );
-
-	enum_<uq::PolynomBasis>("PolynomBasis")
+	enum_<uq::PolynomBasis>(m, "PolynomBasis")
 		.value("Hermite", uq::PolynomBasis::Hermite)
 		.value("Legendre", uq::PolynomBasis::Legendre)
 	;

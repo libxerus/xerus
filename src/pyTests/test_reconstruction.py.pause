@@ -4,6 +4,11 @@ import numpy as np
 from numpy.polynomial.legendre import legval
 
 class TestReconstruction(unittest.TestCase):
+    def test_constructors(self):
+        xe.RankOneMeasurementSet(xe.RankOneMeasurementSet())
+        xe.SinglePointMeasurementSet(xe.SinglePointMeasurementSet())
+        xe.UQMeasurementSet(xe.UQMeasurementSet())
+
 	def test_small_reconstruction_weighted(self):
 		# the function to approximate
 		def fnc(x, y):

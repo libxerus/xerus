@@ -1,0 +1,63 @@
+{% set name = "Xerus" %}
+{% set version = "4.0.1" %}
+{% set branch = "v4.0.1_conda" %}
+
+package:
+  name: {{ name|lower }}
+  version: {{ version }}
+
+source:
+  - git_url: https://github.com/libxerus/xerus.git
+    git_tag: {{ branch }}
+    folder: xerus
+
+build:
+  number: 1
+  skip: true       # [py<34 or win]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - make
+    - pip >=18.1
+  host:
+    - python
+    - numpy
+    - openblas
+    - suitesparse
+    - lapack
+    - boost-cpp >=1.69.0  # boost-cpp: boost without python
+    - llvm-openmp  # [osx]
+    - libgomp      # [linux]
+    #- gdb           # bfd
+    #- backward-cpp  # option for better python-like backtraces
+  run:
+    - {{ pin_compatible('python', max_pin='x.x') }}
+    - {{ pin_compatible('numpy') }}
+    - {{ pin_compatible('openblas', max_pin='x.x') }}
+    - {{ pin_compatible('suitesparse', max_pin='x.x') }}
+    - {{ pin_compatible('lapack') }}
+    - {{ pin_compatible('boost-cpp', max_pin='x.x.x') }}
+    - {{ pin_compatible('llvm-openmp') }}  # [osx]
+    - {{ pin_compatible('libgomp') }}      # [linux]
+
+test:
+  files:
+    - VERSION
+  source_files:
+    - xerus/src/pyTests
+
+about:
+  home: https://git.hemio.de/xerus/xerus.git
+  license: "AGPL 3.0"
+  license_file: LICENSE
+  summary: "A c++ library for numerical calculations with higher order tensors"
+  description: |
+    The Xerus library is a general purpose library for numerical calculations with higher order tensors, Tensor-Train Decompositions / Matrix Product States and other Tensor Networks.
+    The focus of development was the simple usability and adaptibility to any setting that requires higher order tensors or decompositions thereof.
+  doc_url: https://www.libxerus.org/
+  dev_url: https://git.hemio.de/xerus/xerus
+
+extra:
+  recipe-maintainers:
+    - trunschk
