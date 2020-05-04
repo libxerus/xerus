@@ -348,6 +348,9 @@ clean:
 	-rm -f $(TEST_NAME)
 	-rm -f include/xerus.h.gch
 	make -C doc clean
+	-rm xerus/libxerus_misc.so
+	-rm xerus/libxerus.so
+	-rm xerus/xerus.so
 
 
 
