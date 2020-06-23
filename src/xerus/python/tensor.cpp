@@ -193,7 +193,7 @@ arg("dim")
 	.def("__str__", &Tensor::to_string)
 	/* .def(-self) */
 	.def("__neg__",
-		+[](TTTensor& _self) {
+		+[](Tensor& _self) {
 			return (-1)*_self;
 		})
 	.def(self + self)
@@ -206,7 +206,7 @@ arg("dim")
 	.def(self / value_t())
 	/* .def(self /= self) */
 	.def("__itruediv__",
-		+[](TTTensor& _self, const value_t _other) {
+		+[](Tensor& _self, const value_t _other) {
 			return (_self *= (1/_other));
 		})
 
