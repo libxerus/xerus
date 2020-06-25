@@ -58,6 +58,28 @@ namespace xerus { namespace uq {
 		return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
 	}
 
+	template<typename T>
+	std::string print_list(const std::vector<T>& _list) {
+		std::ostringstream stream;
+		for (size_t i=0; i<_list.size(); ++i) {
+			stream << std::to_string(_list[i]) << " ";
+		}
+		std::string output = "[" + stream.str();
+		output.replace(output.length()-1, 1, "]");
+		return output;
+	}
+
+	template<typename T>
+	std::string print_list(const std::vector<T>& _list, const std::function<std::string(const T)>& _formatter) {
+		std::ostringstream stream;
+		for (size_t i=0; i<_list.size(); ++i) {
+			stream << _formatter(_list[i]) << " ";
+		}
+		std::string output = "[" + stream.str();
+		output.replace(output.length()-1, 1, "]");
+		return output;
+	}
+
 	std::vector<size_t> compute_max_theoretic_ranks(const std::vector<size_t>& _dimensions) {
 		// np.minimum(np.cumprod(d[:-1]), np.cumprod(d[:0:-1])[::-1])
 		std::vector<size_t> cumprod_left(_dimensions.size()-1);
@@ -107,7 +129,7 @@ namespace xerus { namespace uq {
 		return ret;
 	}
 
-	Tensor reinterpret_dimensions(const Tensor& _tensor, const Tensor::DimensionTuple _dimensions) {
+	Tensor reinterpret_dimensions(const Tensor& _tensor, const Tensor::DimensionTuple& _dimensions) {
 		Tensor ret(_tensor);
 		ret.reinterpret_dimensions(_dimensions);
 		return ret;
@@ -121,6 +143,14 @@ namespace xerus { namespace uq {
 			ret[{i,i}] = _modifier(_entries[i]);
 		}
 		ret.reinterpret_dimensions(dimensions);
+		return ret;
+	}
+
+	double max_norm(const Tensor& _tensor) {
+		double ret = 0.0;
+		for (size_t i=0; i<_tensor.size; ++i) {
+			ret = std::max(ret, std::abs(_tensor[i]));
+		}
 		return ret;
 	}
 
@@ -156,7 +186,7 @@ namespace xerus { namespace uq {
 		// ensure measures are consistent with x and values
 		REQUIRE(_measures.size() == M-1, "...");
 		for (size_t m=1; m<M; ++m) {
-			REQUIRE(_measures[m-1].dimensions == std::vector<size_t>({N, x.dimensions[m]}), "...");
+			REQUIRE(_measures[m-1].dimensions == Tensor::DimensionTuple({N, x.dimensions[m]}), "...");
 		}
 		// ensure x is consistent with values
 		REQUIRE(x.dimensions[0] == P, "...");
@@ -180,7 +210,7 @@ namespace xerus { namespace uq {
 	void SALSA::move_core_left(const bool adapt) {
 		//TODO: You can use misc::product.
 		const size_t pos = x.corePosition;
-		LOG(debug, "Entering move_core_left(" << adapt << ")    [" << pos-1 << " <-- " << pos << "]");
+		LOG(info, "Entering move_core_left(" << adapt << ")    [" << pos-1 << " <-- " << pos << "]");
 		REQUIRE(0 < pos, "core at position " << pos << " can not move in direction 'left' in tensor of order " << x.order());
 
 		Tensor& old_core = x.component(pos);
@@ -199,7 +229,7 @@ namespace xerus { namespace uq {
 
 		if (adapt) {
 			// adapt the rank (pos-1)--(pos) i.e. x.rank(pos-1)
-			size_t maxRank = std::min(maxRanks[pos-1]+kmin, maxTheoreticalRanks[pos-1]);
+			size_t maxRank = std::min(std::max(maxRanks[pos-1], maxRanks[pos-1]+kmin), maxTheoreticalRanks[pos-1]);
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(new_core, S, old_core, maxRank, threshold);
 			x.nodes[pos].neighbors[2].dimension = new_core.dimensions[2];
@@ -234,7 +264,7 @@ namespace xerus { namespace uq {
 	void SALSA::move_core_right(const bool adapt) {
 		//TODO: You can use misc::product.
 		const size_t pos = x.corePosition;
-		LOG(debug, "Entering move_core_right(" << adapt << ")    [" << pos << " --> " << pos+1 << "]");
+		LOG(info, "Entering move_core_right(" << adapt << ")    [" << pos << " --> " << pos+1 << "]");
 		REQUIRE(pos+1 < x.order(), "core at position " << pos << " can not move in direction 'right' in tensor of order " << x.order());
 
 		Tensor& old_core = x.component(pos);
@@ -250,7 +280,7 @@ namespace xerus { namespace uq {
 
 		if (adapt) {
 			// adapt the rank (pos)--(pos+1) i.e. x.rank(pos)
-			size_t maxRank = std::min(maxRanks[pos]+kmin, maxTheoreticalRanks[pos]);
+			size_t maxRank = std::min(std::max(maxRanks[pos], maxRanks[pos]+kmin), maxTheoreticalRanks[pos]);
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(old_core, S, new_core, maxRank, threshold);
 			x.nodes[pos+1].neighbors[2].dimension = old_core.dimensions[2];
@@ -380,7 +410,7 @@ namespace xerus { namespace uq {
 
 	void SALSA::adapt_rank(Tensor& _U, Tensor& _S, Tensor& _Vt, const size_t _maxRank, const double _threshold) const {
 		//TODO: review again!
-		LOG(debug, "Entering adapt_rank()");
+		LOG(debug, "Entering adapt_rank(maxRank=" << _maxRank << ", threshold=" << string_format("%.2e", _threshold) << ")");
 		size_t eU = _U.order()-1; //TODO: rename
 		size_t eV = _Vt.order()-1;
 		REQUIRE(_U.dimensions[eU] == _S.dimensions[0] &&  _S.dimensions[1] == _Vt.dimensions[0], "Inconsistent dimensions: " << _U.dimensions << " vs " << _S.dimensions << " vs " << _Vt.dimensions);
@@ -390,8 +420,10 @@ namespace xerus { namespace uq {
 			if (_S[{rank,rank}] <= smin) break;
 		}
 		full_rank = std::min(rank+kmin, _maxRank);
+		LOG(debug, "rank=" << rank << "    full_rank=" << full_rank);
 
 		while (_S.dimensions[0] < full_rank) {
+			LOG(info, "Increase rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]+1);
 			// Um,Un = U.size/U.dimensions[eU], U.dimensions[eU]
 			// Vtm,Vtn = Vt.dimensions[0], Vt.size/Vt.dimensions[0]
 			// The rank can only be increased when the dimensions of U and Vt allow it (Um > Un and Vtm < Vtn).
@@ -402,7 +434,7 @@ namespace xerus { namespace uq {
 			_S.resize_mode(0, _S.dimensions[0]+1);
 			_S.resize_mode(1, _S.dimensions[1]+1);
 			_S += 0.01 * smin * Tensor::dirac(_S.dimensions, {_S.dimensions[0]-1, _S.dimensions[1]-1});
-			REQUIRE(_S.sparsity() == _S.dimensions[0], "IE");
+			/* REQUIRE(_S.sparsity() == _S.dimensions[0], "IE: " << _S.sparsity() << " !=  " << _S.dimensions[0] << "Tensor:\n" << _S);  //TODO: Diese Bedingung muss nicht erfüllt sein, denn für 2x2-Matrizen wird immer das dense Format verwendet! */
 
 			Tensor slate, tmp;
 			std::vector<size_t> slate_dimensions, slate_index;
@@ -412,11 +444,19 @@ namespace xerus { namespace uq {
 			slate_dimensions = std::vector<size_t>(_U.dimensions.cbegin(), _U.dimensions.cend()-1);
 			slate = Tensor::random(slate_dimensions);
 			slate /= slate.frob_norm();
+
 			contract(tmp, slate, _U, eU);
-			REQUIRE(tmp.order() == 1 && tmp.dimensions[0] == _U.dimensions[eU], "IE");
+			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_U.dimensions[eU]}), "IE");
 			contract(tmp, _U, tmp, 1);
 			slate -= tmp;
 			slate /= slate.frob_norm();
+
+			contract(tmp, slate, _U, eU);
+			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_U.dimensions[eU]}), "IE");
+			contract(tmp, _U, tmp, 1);
+			slate -= tmp;
+			slate /= slate.frob_norm();
+
 			slate_dimensions.push_back(1);
 			slate.reinterpret_dimensions(slate_dimensions);
 			slate_index = std::vector<size_t>(eU+1, 0); slate_index[eU] = _U.dimensions[eU]-1;
@@ -426,17 +466,26 @@ namespace xerus { namespace uq {
 			slate_dimensions = std::vector<size_t>(_Vt.dimensions.cbegin()+1, _Vt.dimensions.cend());
 			slate = Tensor::random(slate_dimensions);
 			slate /= slate.frob_norm();
+
 			contract(tmp, _Vt, slate, eV);
-			REQUIRE(tmp.order() == 1 && tmp.dimensions[0] == _Vt.dimensions[0], "IE");
+			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_Vt.dimensions[0]}), "IE");
 			contract(tmp, tmp, _Vt, 1);
 			slate -= tmp;
 			slate /= slate.frob_norm();
+
+			contract(tmp, _Vt, slate, eV);
+			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_Vt.dimensions[0]}), "IE");
+			contract(tmp, tmp, _Vt, 1);
+			slate -= tmp;
+			slate /= slate.frob_norm();
+
 			slate_dimensions.insert(slate_dimensions.begin(), 1);
 			slate.reinterpret_dimensions(slate_dimensions);
 			slate_index = std::vector<size_t>(eV+1, 0); slate_index[0] = _Vt.dimensions[0]-1;
 			_Vt.offset_add(slate, slate_index);
 		}
 		if (_S.dimensions[0] > full_rank && _S[{_S.dimensions[0]-1, _S.dimensions[1]-1}] < _threshold) {  // remove at most 1 rank per call
+			LOG(info, "Decrease rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]-1);
 			_S.remove_slate(0, _S.dimensions[0]-1);
 			_S.remove_slate(1, _S.dimensions[1]-1);
 			_U.remove_slate(eU, _U.dimensions[eU]-1);
@@ -450,13 +499,12 @@ namespace xerus { namespace uq {
 		LOG(debug, "Leaving adapt_rank()");
 	}
 
-	double SALSA::residual(const std::pair<size_t, size_t> _slice) const {
+	double SALSA::residual(const std::pair<size_t, size_t>& _slice) const {
 		const auto [from, to] = _slice;
 		LOG(debug, "Entering residual((" << from << ", " << to << "))");
 		REQUIRE(x.corePosition == 0, "IE");
 		REQUIRE(from <= to && to <= N, "IE");
 		const Tensor shuffledX = reinterpret_dimensions(x.get_component(0), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
-
 		Tensor tmp;
 		double res = 0.0, valueNorm = 0.0;
 		#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm)
@@ -488,10 +536,9 @@ namespace xerus { namespace uq {
 		}
 		contract(Gamma_sq, Gamma_sq, Tensor::identity({e,e}), 0);
 		contract(Gamma_sq, Gamma_sq, Tensor::identity({r,r}), 0);
-		/* reshuffle(Gamma_sq, Gamma_sq, {0,2,4,1,3,5});  // axbycz -> abcxyz */
 		//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
 		reshuffle(Gamma_sq, Gamma_sq, {0,3,1,4,2,5});  // axbycz -> abcxyz
-		/* REQUIRE(Gamma_sq.dimensions == Tensor::DimensionTuple{l,e,r,l,e,r}, "IE"); */
+		REQUIRE(Gamma_sq.dimensions == Tensor::DimensionTuple({l,e,r,l,e,r}), "IE");
 
 		// compute right part
 		Tensor Theta_sq({r,r});
@@ -505,10 +552,9 @@ namespace xerus { namespace uq {
 		}
 		contract(Theta_sq, Tensor::identity({e,e}), Theta_sq, 0);
 		contract(Theta_sq, Tensor::identity({l,l}), Theta_sq, 0);
-		/* reshuffle(Theta_sq, Theta_sq, {0,2,4,1,3,5});  // axbycz -> abcxyz */
 		//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
 		reshuffle(Theta_sq, Theta_sq, {0,3,1,4,2,5});  // axbycz -> abcxyz
-		/* REQUIRE(Theta_sq.dimensions == Tensor::DimensionTuple{l,e,r,l,e,r}, "IE"); */
+		REQUIRE(Theta_sq.dimensions == Tensor::DimensionTuple({l,e,r,l,e,r}), "IE");
 
 		LOG(debug, "Leaving omega_operator()");
 		return misc::sqr(omega) * (Gamma_sq + Theta_sq);
@@ -518,7 +564,8 @@ namespace xerus { namespace uq {
 		LOG(debug, "Entering alpha_operator()");
 		const size_t pos = x.corePosition;
 		const size_t l = x.get_component(pos).dimensions[0],
-					 e = x.get_component(pos).dimensions[1];
+					 e = x.get_component(pos).dimensions[1],
+					 r = x.get_component(pos).dimensions[2];
 
 		Tensor Op;
 		if (pos == 0) { Op = Tensor::identity({1,1}); }
@@ -526,17 +573,124 @@ namespace xerus { namespace uq {
 		contract(Op, Op, basisWeights[pos], 0);
 		if (pos < M-1) { contract(Op, Op, rightRegularizationStack[pos+1], 0); }
 		if (pos == x.order()-1) { Op.reinterpret_dimensions({l,l,e,e,1,1}); }
-		/* reshuffle(Op, Op, {0,2,4,1,3,5});  // axbycz -> abcxyz */
 		//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
 		reshuffle(Op, Op, {0,3,1,4,2,5});  // axbycz -> abcxyz
-		/* REQUIRE(Op.dimensions == Tensor::DimensionTuple{l,e,r,l,e,r}, "IE"); */
+		REQUIRE(Op.dimensions == Tensor::DimensionTuple({l,e,r,l,e,r}), "IE");
 
 		LOG(debug, "Leaving alpha_operator()");
 		return misc::sqr(alpha) * Op;
 	}
 
+	double SALSA::slow_residual(const std::pair<size_t, size_t>& _slice) const {
+		LOG(info, "Entering slow_residual((" << _slice.first << ", " << _slice.second << "))");
+		const size_t pos = x.corePosition;
+		const size_t l = x.get_component(pos).dimensions[0],
+					 e = x.get_component(pos).dimensions[1],
+					 r = x.get_component(pos).dimensions[2];
+
+		Tensor op;
+		Tensor rhs;
+		if (pos == 0) {
+			op = Tensor({e,e,r,r}, Tensor::Representation::Dense);
+			rhs = Tensor({e,r}, Tensor::Representation::Dense);
+			Tensor tmp;
+			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+			#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(_slice, e, pos) private(tmp) reduction(+:op,rhs)
+			for (size_t i=_slice.first; i<_slice.second; ++i) {
+				contract(tmp, Tensor::identity({e,e}), rightStack[pos+1][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				op += tmp;
+
+				contract(tmp, values[i], rightStack[pos+1][i], 0);
+				rhs += tmp;
+			}
+			/* //TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen. */
+			reshuffle(op, op, {0,2,1,3});  // eerr -> erer
+			op.reinterpret_dimensions({1,e,r,1,e,r});
+			rhs.reinterpret_dimensions({1,e,r});
+		} else if (pos == 1) {
+			op = Tensor({e,r,e,r}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+			Tensor tmp;
+			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+			#pragma omp parallel for default(none) shared(leftRHSStack, rightStack, measures) firstprivate(_slice, l, e, pos) private(tmp) reduction(+:op,rhs)
+			for (size_t i=_slice.first; i<_slice.second; ++i) {
+				contract(tmp, measures[pos][i], rightStack[pos+1][i], 0);
+				contract(tmp, tmp, measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				op += tmp;
+
+				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				rhs += tmp;
+			}
+			contract(op, Tensor::identity({l,l}), op, 0);  // leftLHSStack[pos-1][i] is the identity and the tensor product is a distributive binary operation
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
+		} else if (pos < M-1) {
+			op = Tensor({l,l,e,r,e,r}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+			Tensor tmp;
+			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(_slice, pos) private(tmp) reduction(+:op,rhs)
+			for (size_t i=_slice.first; i<_slice.second; ++i) {
+				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				contract(tmp, tmp, measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				/* REQUIRE(op.is_dense() && !op.has_factor() && op.get_internal_dense_data().unique(), "IE"); */
+				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
+				/* misc::add(op.get_dense_data(), tmp.get_dense_data(), tmp.size); */
+				op += tmp;
+
+				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				/* REQUIRE(rhs.is_dense() && !rhs.has_factor() && rhs.get_internal_dense_data().unique(), "IE"); */
+				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
+				/* misc::add(rhs.get_dense_data(), tmp.get_dense_data(), tmp.size); */
+				rhs += tmp;
+			}
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			/* reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler */
+			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
+		} else {
+			op = Tensor({l,l,e,e}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e}, Tensor::Representation::Dense);
+			Tensor tmp;
+			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(_slice, pos, l, e) private(tmp) reduction(+:op,rhs)
+			for (size_t i=_slice.first; i<_slice.second; ++i) {
+				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+				contract(tmp, tmp, measures[pos][i], 0);
+				op += tmp;
+
+				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
+				rhs += tmp;
+			}
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			reshuffle(op, op, {0,2,1,3});  // llee -> lele
+			op.reinterpret_dimensions({l,e,1,l,e,1});
+			rhs.reinterpret_dimensions({l,e,1});
+		}
+		REQUIRE(op.dimensions == Tensor::DimensionTuple({l,e,r, l,e,r}), "IE");  // In a macro you need parantheses around an initializer list.
+		REQUIRE(rhs.dimensions == Tensor::DimensionTuple({l,e,r}), "IE");
+
+		// ||Ax - b||^2 = xtAtAx - 2*xtAtb + btb
+		// Split x into core and projection: x = Pc
+
+		const Tensor& core = x.get_component(pos);
+		const double xtAtAx = contract(contract(core, op, 3), core, 3)[0];
+		const double xtAtb  = contract(core, rhs, 3)[0];
+		const double btb    = misc::sqr(valueNorm_trainingSet);
+
+		LOG(info, "Leaving slow_residual()");
+		/* return frob_norm(contract(op, x.get_component(pos), 3) - rhs); */
+		return std::sqrt(std::max(xtAtAx - 2*xtAtb + btb, 0.0));
+	}
+
+
 	void SALSA::solve_local() {
-		LOG(debug, "Entering solve_local()");
+		LOG(info, "Entering solve_local()");
 		//TODO: use only the training set for optimization
 		const size_t pos = x.corePosition;  //TODO: rename: position
 		const size_t l = x.get_component(pos).dimensions[0],
@@ -544,169 +698,108 @@ namespace xerus { namespace uq {
 					 r = x.get_component(pos).dimensions[2];
 
 		//TODO: split N = Nt + Nv (train and validation)
-		Tensor op({l,e,r, l,e,r});
-		Tensor rhs({l,e,r});
+		Tensor op;
+		Tensor rhs;
 		if (pos == 0) {
+			op = Tensor({e,e,r,r}, Tensor::Representation::Dense);
+			rhs = Tensor({e,r}, Tensor::Representation::Dense);
 			Tensor tmp;
 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
 			#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(trainingSet, e, pos) private(tmp) reduction(+:op,rhs)
 			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				tmp = reinterpret_dimensions(Tensor::identity({e,e}), {1,1,e,e});
+				contract(tmp, Tensor::identity({e,e}), rightStack[pos+1][i], 0);
 				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-				reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler
 				op += tmp;
 
-				tmp = reinterpret_dimensions(values[i], {1,x.dimensions[0]});
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				contract(tmp, values[i], rightStack[pos+1][i], 0);
 				rhs += tmp;
 			}
+			/* //TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen. */
+			reshuffle(op, op, {0,2,1,3});  // eerr -> erer
+			op.reinterpret_dimensions({1,e,r,1,e,r});
+			rhs.reinterpret_dimensions({1,e,r});
 		} else if (pos == 1) {
+			op = Tensor({e,r,e,r}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
 			Tensor tmp;
 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
 			#pragma omp parallel for default(none) shared(leftRHSStack, rightStack, measures) firstprivate(trainingSet, l, e, pos) private(tmp) reduction(+:op,rhs)
 			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				contract(tmp, Tensor::identity({l,l}), measures[pos][i], 0);  // leftLHSStack[pos-1][i] is the identity
+				contract(tmp, measures[pos][i], rightStack[pos+1][i], 0);
 				contract(tmp, tmp, measures[pos][i], 0);
 				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-				reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler
 				op += tmp;
 
 				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
 				contract(tmp, tmp, rightStack[pos+1][i], 0);
 				rhs += tmp;
 			}
+			contract(op, Tensor::identity({l,l}), op, 0);  // leftLHSStack[pos-1][i] is the identity and the tensor product is a distributive binary operation
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
 		} else if (pos < M-1) {
+			op = Tensor({l,l,e,r,e,r}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
 			Tensor tmp;
 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
 			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(trainingSet, pos) private(tmp) reduction(+:op,rhs)
 			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+				contract(tmp, tmp, rightStack[pos+1][i], 0);
 				contract(tmp, tmp, measures[pos][i], 0);
 				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-				reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler
+				/* REQUIRE(op.is_dense() && !op.has_factor() && op.get_internal_dense_data().unique(), "IE"); */
+				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
+				/* misc::add(op.get_dense_data(), tmp.get_dense_data(), tmp.size); */
 				op += tmp;
-
-				/* contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0); */
-				/* contract(tmp, tmp, rightStack[pos+1][i], 0); */
-				/* reshuffle(tmp, tmp, {0,2,3,1}); */
-				/* contract(tmp, tmp, measures[pos][i], 0); */
-				/* contract(tmp, tmp, rightStack[pos+1][i], 0); */
-				/* op += tmp; */
 
 				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
 				contract(tmp, tmp, rightStack[pos+1][i], 0);
+				/* REQUIRE(rhs.is_dense() && !rhs.has_factor() && rhs.get_internal_dense_data().unique(), "IE"); */
+				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
+				/* misc::add(rhs.get_dense_data(), tmp.get_dense_data(), tmp.size); */
 				rhs += tmp;
 			}
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			/* reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler */
+			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
 		} else {
+			op = Tensor({l,l,e,e}, Tensor::Representation::Dense);
+			rhs = Tensor({l,e}, Tensor::Representation::Dense);
 			Tensor tmp;
 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
 			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(trainingSet, pos, l, e) private(tmp) reduction(+:op,rhs)
 			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
 				contract(tmp, tmp, measures[pos][i], 0);
-				reshuffle(tmp, tmp, {0,2,1,3});  // llee -> lele
-				tmp.reinterpret_dimensions({l,e,1,l,e,1});
 				op += tmp;
 
-				/* tmp.reinterpret_dimensions({l,l,e,1}); */
-				/* reshuffle(tmp, tmp, {0,2,3,1}); */
-				/* contract(tmp, tmp, measures[pos][i], 0); */
-				/* tmp.reinterpret_dimensions({l,e,1,l,e,1}); */
-				/* op += tmp; */
-
 				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
-				tmp.reinterpret_dimensions({l,e,1});
 				rhs += tmp;
 			}
+			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
+			reshuffle(op, op, {0,2,1,3});  // llee -> lele
+			op.reinterpret_dimensions({l,e,1,l,e,1});
+			rhs.reinterpret_dimensions({l,e,1});
 		}
-
-		/* if (pos <= 1) { */
-		/*     #pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions)) */
-		/*     #pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(N, pos, e, l) private(tmp) reduction(+:op,rhs) */
-		/*     for (size_t i=0; i<N; ++i) { */
-		/*         if (pos == 0) { */
-		/*             tmp = Tensor::identity({e,e}); */
-		/*             tmp.reinterpret_dimensions({1,1,e,e}); */
-		/*         } else if (pos == 1) { */
-		/*             contract(tmp, Tensor::identity({l,l}), Tensor::identity({e,e}), 0); */
-		/*         } else { */
-		/*             contract(tmp, leftLHSStack[pos-1][i], Tensor::identity({e,e}), 0); */
-		/*         } */
-
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         /1* reshuffle(tmp, tmp, {0,2,4,1,3}); *1/ */
-		/*         //TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen. */
-		/*         reshuffle(tmp, tmp, {0,3,1,4,2}); */
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         op += tmp; */
-
-		/*         if (pos == 0) { */
-		/*             tmp = values[i]; */
-		/*             tmp.reinterpret_dimensions({1,x.dimensions[0]}); */
-		/*         } else { */
-		/*             contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0); */
-		/*         } */
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         rhs += tmp; */
-		/*     } */
-		/* /1* } else if (pos == 1) { *1/ */
-		/* } else if (pos < M-1) { */
-		/*     #pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions)) */
-		/*     #pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(N, pos) private(tmp) reduction(+:op,rhs) */
-		/*     for (size_t i=0; i<N; ++i) { */
-		/*         // firstprivate(_corePosition, _setId, dyadComp, tmp, shuffledX) default(none) */
-		/*         contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0); */
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         reshuffle(tmp, tmp, {0,2,3,1}); */
-		/*         contract(tmp, tmp, measures[pos][i], 0); */
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         op += tmp; */
-
-		/*         contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0); */
-		/*         contract(tmp, tmp, rightStack[pos+1][i], 0); */
-		/*         rhs += tmp; */
-		/*     } */
-		/* } else { */
-		/*     #pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions)) */
-		/*     #pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(N, pos, l, e, r) private(tmp) reduction(+:op,rhs) */
-		/*     for (size_t i=0; i<N; ++i) { */
-		/*         // firstprivate(_corePosition, _setId, dyadComp, tmp, shuffledX) default(none) */
-		/*         contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0); */
-		/*         tmp.reinterpret_dimensions({l,l,e,1}); */
-		/*         reshuffle(tmp, tmp, {0,2,3,1}); */
-		/*         contract(tmp, tmp, measures[pos][i], 0); */
-		/*         tmp.reinterpret_dimensions({l,e,1,l,e,1}); */
-		/*         op += tmp; */
-
-		/*         contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0); */
-		/*         tmp.reinterpret_dimensions({l,e,r}); */
-		/*         rhs += tmp; */
-		/*     } */
-		/* } */
+		REQUIRE(op.dimensions == Tensor::DimensionTuple({l,e,r, l,e,r}), "IE");  // In a macro you need parantheses around an initializer list.
+		REQUIRE(rhs.dimensions == Tensor::DimensionTuple({l,e,r}), "IE");
 
 		const Tensor op_alpha = alpha_operator();
 		const Tensor op_omega = omega_operator();
 
 		Tensor& core = x.component(pos);
+		solve(core, op+op_alpha+op_omega, rhs);
 
-		if (maxIRsteps == 0) { solve(core, op+op_alpha+op_omega, rhs); }
-		else {
-			Tensor IR, op_IRalpha;  // iterative reweighting
-			Tensor prev_core;
-			for (size_t step=0; step<maxIRsteps; ++step) {
-				IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
-				contract(op_IRalpha, IR, op_alpha, 3);
-				contract(op_IRalpha, op_IRalpha, IR, 3);
-				prev_core = core;
-				solve(core, op+op_IRalpha+op_omega, rhs);
-				if (frob_norm(prev_core - core) < IRtolerance*frob_norm(prev_core)) break;
-			}
+		// iterative reweighting
+		Tensor IR, op_IRalpha, prev_core;
+		for (size_t step=0; step<maxIRsteps; ++step) {
+			IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
+			contract(op_IRalpha, IR, op_alpha, 3);
+			contract(op_IRalpha, op_IRalpha, IR, 3);
+			prev_core = core;
+			solve(core, op+op_IRalpha+op_omega, rhs);
+			if (max_norm(prev_core - core) < IRtolerance*frob_norm(prev_core)) break;
 		}
 
 		size_t density = 0; // np.count_nonzero(abs(sol) > sparsityThreshold)/sol.size
@@ -722,14 +815,14 @@ namespace xerus { namespace uq {
 	void SALSA::print_parameters() const {
 		LOG(debug, "Entering print_parameters()");
 		const size_t max_param_len = 26;  // "maxNonImprovingAlphaCycles".size()
-		auto print_param = [max_param_len](std::string name, auto value) {
+		const auto print_param = [max_param_len](std::string name, auto value) {
 			const std::string pad(max_param_len-name.length(), ' ');
 			std::cout << "  " << name << " = " << pad << value << "\n";
 		};
 		const std::string sep = std::string(125, '-')+"\n";
 		std::cout << sep;
-		print_param("dimensions", x.dimensions);
-		print_param("initial_ranks", x.ranks());
+		print_param("dimensions", print_list(x.dimensions));
+		print_param("initial_ranks", print_list(x.ranks()));
 		print_param("num_samples", N);
 		std::cout << sep;
 		print_param("controlSetFraction", controlSetFraction);
@@ -746,7 +839,10 @@ namespace xerus { namespace uq {
 		print_param("sparsityThreshold", sparsityThreshold);
 		std::cout << '\n';
 		print_param("kmin", kmin);
-		print_param("maxRanks", maxRanks);
+		print_param("maxRanks", print_list<size_t>(maxRanks, [](const size_t _rank) -> std::string {
+			if (_rank == std::numeric_limits<size_t>::max()) { return u8"\u221e"; }
+			return std::to_string(_rank);
+		}));
 		std::cout << '\n';
 		print_param("fomega", fomega);
 		print_param("omega_factor", omega_factor);
@@ -764,7 +860,7 @@ namespace xerus { namespace uq {
 		//TODO: assert symmetry
 		REQUIRE(basisWeights.size() == M, "...");
 		for (size_t m=0; m<M; ++m) {
-			REQUIRE(basisWeights[m].order() == 2 && basisWeights[m].dimensions[0] == x.dimensions[m] && basisWeights[m].dimensions[1] == x.dimensions[m], "...");
+			REQUIRE(basisWeights[m].dimensions == Tensor::DimensionTuple({x.dimensions[m], x.dimensions[m]}), "...");
 		}
 
 		// The sets have already been shuffled in the constructor. Now they need to be split.
@@ -783,6 +879,13 @@ namespace xerus { namespace uq {
 			valueNorm_trainingSet += misc::sqr(frob_norm(values[j]));
 		}
 		valueNorm_trainingSet = std::sqrt(valueNorm_trainingSet);
+
+		valueNorm_validationSet = 0.0;
+		#pragma omp parallel for default(none) shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet)
+		for(size_t j=validationSet.first; j<validationSet.second; ++j) {
+			valueNorm_validationSet += misc::sqr(frob_norm(values[j]));
+		}
+		valueNorm_validationSet = std::sqrt(valueNorm_validationSet);
 
 		// compute SALSA parameters
 		double res = residual(std::make_pair(0, N));
@@ -803,41 +906,30 @@ namespace xerus { namespace uq {
 		const std::string grey_30 = u8"\033[38;5;239m";
 		const std::string grey_50 = u8"\033[38;5;244m";
 		const std::string reset = u8"\033[0m";
-		std::ostringstream ranks;
-		for (size_t m=0; m<M-1; ++m) {
-			/* assert np.all(singularValues[m] > 0) */
+		std::string output = print_list<std::vector<double>>(singularValues, [&](const std::vector<double>& _sVs) {
+			/* assert np.all(_sVs > 0) */
 			size_t rank;
-			for (rank=0; rank<singularValues[m].size(); ++rank) {
-				if (singularValues[m][rank] <= smin) break;
+			for (rank=0; rank<_sVs.size(); ++rank) {
+				if (_sVs[rank] <= smin) break;
 			}
-			ranks << rank;
 			double inactive = 0.0;
-			if (rank < singularValues[m].size()) {
-				inactive = singularValues[m][rank]/smin;
+			if (rank < _sVs.size()) {
+				inactive = _sVs[rank]/smin;
 				REQUIRE(0 < inactive && inactive < 1, "IE");
 			}
-			/* ranks << wchar_t(2070+size_t(10*inactive)) << L'\u002F' << singularValues[m].size() << L' '; */
-			ranks << grey_50 << "." << size_t(10*inactive) << reset << u8"\u002F" << grey_30 << singularValues[m].size() << reset << " ";
-		}
-		std::string output = "[" + ranks.str();
-		output.replace(output.length()-1, 1, "]");
+			return std::to_string(rank) + "." + grey_50 + std::to_string(size_t(10*inactive)) + reset + u8"\u002F" + grey_30 + std::to_string(_sVs.size()) + reset;
+		});
 		LOG(debug, "Leaving print_fractional_ranks()");
 		return output;
 	}
 
 	std::string SALSA::print_densities() const {
 		LOG(debug, "Entering print_densities()");
-		std::ostringstream densities;
-		for (size_t m=0; m<M; ++m) {
-			size_t d = std::min(size_t(100*weightedNorms[m]+0.5), size_t{99});
-			densities << string_format("%2u ", d);
-			/* if (d < 10) densities << " " << d << " "; */
-			/* else densities << d << " "; */
-		}
-		std::string output = "[" + densities.str();
-		output.replace(output.length()-1, 1, "]%");
+		std::string output = print_list<double>(weightedNorms, [](const double _norm) {  //TODO: rename
+			return string_format("%2u", std::min(size_t(100*_norm+0.5), size_t{99}));
+		});
 		LOG(debug, "Leaving print_densities()");
-		return output;
+		return output + "%";
 	}
 
 	void SALSA::run() {
@@ -848,15 +940,17 @@ namespace xerus { namespace uq {
 		initialize();
 
 		REQUIRE(x.corePosition == 0, "IE");
-		// sweep left -> right
+		LOG(info, "Sweep: left --> right");
 		for (size_t m=0; m<M-1; ++m) {
 			REQUIRE(x.corePosition == m, "IE");
+			LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
 			solve_local();
 			move_core_right(false);
 		}
-		// sweep right -> left
+		LOG(info, "Sweep: right --> left");
 		for (size_t m=M-1; m>0; --m) {
 			REQUIRE(x.corePosition == m, "IE");
+			LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
 			solve_local();
 			move_core_left(false);
 		}
@@ -868,12 +962,11 @@ namespace xerus { namespace uq {
 		trainingResiduals.push_back(residual(trainingSet));
 		validationResiduals.push_back(residual(validationSet));
 
-		double initialResidual = trainingResiduals.back();  //TODO: rename
-		size_t bestIteration = 0;
-		TTTensor bestX = x;
-		/* double bestAlpha = alpha; */
-		double bestTrainingResidual = trainingResiduals.back();
-		double bestValidationResidual = validationResiduals.back();
+		initialResidual = trainingResiduals.back();  //TODO: rename
+		bestIteration = 0;
+		bestX = x;
+		bestTrainingResidual = trainingResiduals.back();
+		bestValidationResidual = validationResiduals.back();
 		double prev_bestValidationResidual = validationResiduals.back();
 		/* double bestValidationResidual_cycle = bestValidationResidual; */
 		//TODO: der ganze best-kram (außer prev_bestValidationResidual) und initialResidual sollte vllt class attributes werden
@@ -898,17 +991,19 @@ namespace xerus { namespace uq {
 		};
 		print_update();
 
-		for (; iteration<maxIterations; ++iteration) {
+		for (iteration=1; iteration<maxIterations; ++iteration) {
 			REQUIRE(x.corePosition == 0, "IE");
-			// sweep left -> right
+			LOG(info, "Sweep: left --> right");
 			for (size_t m=0; m<M-1; ++m) {
 				REQUIRE(x.corePosition == m, "IE");
+				LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
 				solve_local();
 				move_core_right(true);
 			}
-			// sweep right -> left
+			LOG(info, "Sweep: right --> left");
 			for (size_t m=M-1; m>0; --m) {
 				REQUIRE(x.corePosition == m, "IE");
+				LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
 				solve_local();
 				move_core_left(true);
 			}
@@ -922,7 +1017,6 @@ namespace xerus { namespace uq {
 			if (validationResiduals.back() < (1-minDecrease)*bestValidationResidual) {
 				bestIteration = iteration;
 				bestX = x;
-				/* bestAlpha = alpha; */
 				prev_bestValidationResidual = bestValidationResidual;
 				bestValidationResidual = validationResiduals.back();
 				bestTrainingResidual = trainingResiduals.back();
@@ -936,7 +1030,6 @@ namespace xerus { namespace uq {
 			double res = trainingResiduals.back();
 			omega /= omega_factor;
 			omega = std::max(std::min(omega/fomega, std::sqrt(res)), res);
-			REQUIRE(omega >= res, "IE");
 			omegaMinimal = misc::approx_equal(omega, res, 1e-6);
 			smin = 0.2*std::min(omega, res);
 			omega *= omega_factor;
@@ -963,7 +1056,7 @@ namespace xerus { namespace uq {
 					break;
 				}
 
-				res = validationResiduals.back() * valueNorm_trainingSet;
+				res = validationResiduals.back() * valueNorm_validationSet;
 				double prev_alpha = alpha;
 				alpha = alpha/alpha_factor;
 				alpha = std::min(alpha/falpha, std::sqrt(res));
@@ -996,9 +1089,10 @@ namespace xerus { namespace uq {
 			}
 		}
 
-		x = bestX;
-		x.round(maxRanks);
-		/* assert np.all(self.x.ranks() <= np.asarray(self.maxRanks)) */
+		//TODO: the user should do this stuff by herself
+		/* x = bestX; */
+		/* x.round(maxRanks); */
+		/* /1* assert np.all(self.x.ranks() <= np.asarray(self.maxRanks)) *1/ */
 
 		std::cout << string_format("Residual decreased from %.2e to %.2e in %u iterations.\n", initialResidual, bestTrainingResidual, iteration)
 					<< std::string(125, '=') << std::endl;

@@ -45,6 +45,7 @@ namespace xerus { namespace uq {
         std::pair<size_t, size_t> validationSet;
 
         double valueNorm_trainingSet;
+        double valueNorm_validationSet;
 
         std::vector<std::vector<Tensor>> leftLHSStack;  // contains successive contractions of x.T@A.T@A@x
         std::vector<std::vector<Tensor>> leftRHSStack;  // contains successive contractions of x.T@A.T@b
@@ -88,6 +89,12 @@ namespace xerus { namespace uq {
         /* // Reweighting parameters */
         /* std::vector<double> weights; */
 
+        double initialResidual;  //TODO: rename
+        size_t bestIteration;
+        TTTensor bestX;
+        double bestTrainingResidual;
+        double bestValidationResidual;
+
         SALSA(const TTTensor& _x, const std::vector<Tensor>& _measures, const Tensor& _values);
         void run();
 
@@ -97,7 +104,8 @@ namespace xerus { namespace uq {
         void calc_left_stack(const size_t _position);
         void calc_right_stack(const size_t _position);
         void adapt_rank(Tensor& _U, Tensor& _S, Tensor& _Vt, const size_t _maxRank, const double _threshold) const;
-        double residual(const std::pair<size_t, size_t> _slice) const;
+        double residual(const std::pair<size_t, size_t>& _slice) const;
+        double slow_residual(const std::pair<size_t, size_t>& _slice) const;
         Tensor omega_operator() const;
         Tensor alpha_operator() const;
         void solve_local();
