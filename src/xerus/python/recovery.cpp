@@ -176,6 +176,12 @@ void expose_recoveryAlgorithms(module& m) {
 		.def_readwrite("alpha_factor", &uq::SALSA::alpha_factor)
 		.def_readwrite("basisWeights", &uq::SALSA::basisWeights)
 
+		.def_readonly("initialResidual", &uq::SALSA::initialResidual)
+		.def_readonly("bestIteration", &uq::SALSA::bestIteration)
+		.def_readonly("bestX", &uq::SALSA::bestX)
+		.def_readonly("bestTrainingResidual", &uq::SALSA::bestTrainingResidual)
+		.def_readonly("bestValidationResidual", &uq::SALSA::bestValidationResidual)
+
 		.def("run", &uq::SALSA::run)
 	;
 }

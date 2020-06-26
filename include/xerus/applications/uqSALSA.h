@@ -56,6 +56,8 @@ namespace xerus { namespace uq {
         std::vector<std::vector<double>> singularValues;
         std::vector<double> weightedNorms;  //TODO: rename: densities
 
+        bool initialized = false;
+
     public:
         double controlSetFraction = 0.1;
 
@@ -106,6 +108,7 @@ namespace xerus { namespace uq {
         void adapt_rank(Tensor& _U, Tensor& _S, Tensor& _Vt, const size_t _maxRank, const double _threshold) const;
         double residual(const std::pair<size_t, size_t>& _slice) const;
         double slow_residual(const std::pair<size_t, size_t>& _slice) const;
+        std::pair<Tensor, Tensor> ls_operator_and_rhs(const std::pair<size_t, size_t>& _slice) const;
         Tensor omega_operator() const;
         Tensor alpha_operator() const;
         void solve_local();

@@ -52,7 +52,7 @@ namespace xerus { namespace uq {
 	std::string string_format( const std::string& format, Args ... args )
 	{
 		size_t size = snprintf( nullptr, 0, format.c_str(), args ... ) + 1; // Extra space for '\0'
-		if( size <= 0 ){ throw std::runtime_error( "Error during formatting." ); }
+		REQUIRE(size > 0, "Error during formatting.");
 		std::unique_ptr<char[]> buf( new char[ size ] );
 		snprintf( buf.get(), size, format.c_str(), args ... );
 		return std::string( buf.get(), buf.get() + size - 1 ); // We don't want the '\0' inside
@@ -208,9 +208,8 @@ namespace xerus { namespace uq {
 	}
 
 	void SALSA::move_core_left(const bool adapt) {
-		//TODO: You can use misc::product.
 		const size_t pos = x.corePosition;
-		LOG(info, "Entering move_core_left(" << adapt << ")    [" << pos-1 << " <-- " << pos << "]");
+		LOG(debug, "Entering move_core_left(adapt=" << std::string(adapt?"true":"false") << ")    [" << pos-1 << " <-- " << pos << "]");
 		REQUIRE(0 < pos, "core at position " << pos << " can not move in direction 'left' in tensor of order " << x.order());
 
 		Tensor& old_core = x.component(pos);
@@ -239,6 +238,7 @@ namespace xerus { namespace uq {
 		contract(new_core, new_core, S, 1);  // new_core(i^2,j) << new_core(i^2,l) * S(l,j)
 		REQUIRE(new_core.all_entries_valid() && old_core.all_entries_valid(), "IE");
 		x.assume_core_position(pos-1);
+
 		calc_right_stack(pos);
 
 		singularValues[pos-1].resize(S.dimensions[0]);
@@ -246,13 +246,28 @@ namespace xerus { namespace uq {
 			singularValues[pos-1][i] = S[{i,i}];
 		}
 
-		if (1 < pos) {
+		if (initialized && 1 < pos) {
 			Tensor& next_core = x.component(pos-2);
 			calculate_svd(U, S, Vt, new_core, 1, 0, 0);  // (U(left,r1), S(r1,r2), Vt(r2,ext,right)) = new_core(left,ext,right)
 			REQUIRE(U.order() == 2 && U.dimensions[0] == U.dimensions[1], "IE");
 			contract(next_core, next_core, U, 1);
 			contract(new_core, S, Vt, 1);
 			REQUIRE(new_core.all_entries_valid() && next_core.all_entries_valid(), "IE");
+
+			calc_left_stack(pos-2);
+			//TODO: Das muss nicht sein.
+			//      Du kannst Vt auch einfach als `rightOrthogonalTransfrom` speichern.
+			//      Nach der Berechnung der RHS und des Op werden `leftOrthogonalTransform` und `rightOrthogonalTransform` ranmultipliziert.
+			//      Tensor coreTransform;
+			//      contract(coreTransform, leftOrthogonalTransform, Tensor::identity({e,e}), 0);
+			//      contract(coreTransform, coreTransform, rightOrthogonalTransform, 0);
+			//      reshuffle(coreTransform, {0,3,1,4,2,5});  // lleerr -> lerler
+			//      contract(op, coreTransform, op, 3); contract(op, op, coreTransform, 3);
+			//      contract(rhs, coreTransform, rhs, 3);
+			//      Da coreTransform regulär ist kann man die Multiplikation von links mit `coreTransfrom` auch weglassen.
+			//      Da außerdem entweder nur `leftOrthogonalTransfrom` oder `rightOrthogonalTransform` aktiv sind
+			//      (je nach sweep direction ist die andere eine Identität) kann man auch direkt `coreTransform` speichern.
+
 			singularValues[pos-2].resize(S.dimensions[0]);
 			for (size_t i=0; i<S.dimensions[0]; ++i) {
 				singularValues[pos-2][i] = S[{i,i}];
@@ -264,7 +279,7 @@ namespace xerus { namespace uq {
 	void SALSA::move_core_right(const bool adapt) {
 		//TODO: You can use misc::product.
 		const size_t pos = x.corePosition;
-		LOG(info, "Entering move_core_right(" << adapt << ")    [" << pos << " --> " << pos+1 << "]");
+		LOG(debug, "Entering move_core_right(adapt=" << std::string(adapt?"true":"false") << ")    [" << pos << " --> " << pos+1 << "]");
 		REQUIRE(pos+1 < x.order(), "core at position " << pos << " can not move in direction 'right' in tensor of order " << x.order());
 
 		Tensor& old_core = x.component(pos);
@@ -290,6 +305,7 @@ namespace xerus { namespace uq {
 		contract(new_core, S, new_core, 1);  // new_core(i,j^2) << S(i,l) * new_core(l,j^2)
 		REQUIRE(new_core.all_entries_valid() && old_core.all_entries_valid(), "IE");
 		x.assume_core_position(pos+1);
+
 		calc_left_stack(pos);
 
 		singularValues[pos].resize(S.dimensions[0]);
@@ -304,6 +320,9 @@ namespace xerus { namespace uq {
 			contract(next_core, Vt, next_core, 1);
 			contract(new_core, U, S, 1);
 			REQUIRE(new_core.all_entries_valid() && next_core.all_entries_valid(), "IE");
+
+			calc_right_stack(pos+2);  //TODO: see move_core_left
+
 			singularValues[pos+1].resize(S.dimensions[0]);
 			for (size_t i=0; i<S.dimensions[0]; ++i) {
 				singularValues[pos+1][i] = S[{i,i}];
@@ -337,7 +356,7 @@ namespace xerus { namespace uq {
 			for(size_t j = 0; j < N; ++j) {
 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
 				//NOTE: leftLHSStack[0] is the identity
-				contract(leftLHSStack[_position][j], measCmp, true, measCmp, false, 1);          // rl,ls -> rs
+				contract(leftLHSStack[_position][j], measCmp, true, measCmp, false, 1);          // lr,ls -> rs
 				contract(leftRHSStack[_position][j], leftRHSStack[_position-1][j], measCmp, 1);  // r,rs  -> s
 			}
 		} else {
@@ -423,7 +442,7 @@ namespace xerus { namespace uq {
 		LOG(debug, "rank=" << rank << "    full_rank=" << full_rank);
 
 		while (_S.dimensions[0] < full_rank) {
-			LOG(info, "Increase rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]+1);
+			LOG(debug, "Increase rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]+1);
 			// Um,Un = U.size/U.dimensions[eU], U.dimensions[eU]
 			// Vtm,Vtn = Vt.dimensions[0], Vt.size/Vt.dimensions[0]
 			// The rank can only be increased when the dimensions of U and Vt allow it (Um > Un and Vtm < Vtn).
@@ -485,7 +504,7 @@ namespace xerus { namespace uq {
 			_Vt.offset_add(slate, slate_index);
 		}
 		if (_S.dimensions[0] > full_rank && _S[{_S.dimensions[0]-1, _S.dimensions[1]-1}] < _threshold) {  // remove at most 1 rank per call
-			LOG(info, "Decrease rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]-1);
+			LOG(debug, "Decrease rank: " << _S.dimensions[0] << " --> " << _S.dimensions[0]-1);
 			_S.remove_slate(0, _S.dimensions[0]-1);
 			_S.remove_slate(1, _S.dimensions[1]-1);
 			_U.remove_slate(eU, _U.dimensions[eU]-1);
@@ -581,8 +600,8 @@ namespace xerus { namespace uq {
 		return misc::sqr(alpha) * Op;
 	}
 
-	double SALSA::slow_residual(const std::pair<size_t, size_t>& _slice) const {
-		LOG(info, "Entering slow_residual((" << _slice.first << ", " << _slice.second << "))");
+	std::pair<Tensor, Tensor> SALSA::ls_operator_and_rhs(const std::pair<size_t, size_t>& _slice) const {
+		LOG(debug, "Entering ls_operator((" << _slice.first << ", " << _slice.second << "))");
 		const size_t pos = x.corePosition;
 		const size_t l = x.get_component(pos).dimensions[0],
 					 e = x.get_component(pos).dimensions[1],
@@ -675,116 +694,32 @@ namespace xerus { namespace uq {
 		REQUIRE(op.dimensions == Tensor::DimensionTuple({l,e,r, l,e,r}), "IE");  // In a macro you need parantheses around an initializer list.
 		REQUIRE(rhs.dimensions == Tensor::DimensionTuple({l,e,r}), "IE");
 
-		// ||Ax - b||^2 = xtAtAx - 2*xtAtb + btb
-		// Split x into core and projection: x = Pc
+		LOG(debug, "Leaving ls_operator()");
+		return std::make_pair(op, rhs);
+	}
 
-		const Tensor& core = x.get_component(pos);
-		const double xtAtAx = contract(contract(core, op, 3), core, 3)[0];
-		const double xtAtb  = contract(core, rhs, 3)[0];
+	double SALSA::slow_residual(const std::pair<size_t, size_t>& _slice) const {
+		// TODO: Merge with residual?
+		// ||Ax - b||^2 = xtAtAx - 2*xtAtb + btb
+		LOG(debug, "Entering slow_residual((" << _slice.first << ", " << _slice.second << "))");
+
+		const Tensor& core = x.get_component(x.corePosition);
+		const auto[A, b] = ls_operator_and_rhs(_slice);
+
+		const double xtAtAx = contract(contract(core, A, 3), core, 3)[0];
+		const double xtAtb  = contract(core, b, 3)[0];
 		const double btb    = misc::sqr(valueNorm_trainingSet);
 
-		LOG(info, "Leaving slow_residual()");
-		/* return frob_norm(contract(op, x.get_component(pos), 3) - rhs); */
-		return std::sqrt(std::max(xtAtAx - 2*xtAtb + btb, 0.0));
+		LOG(debug, "Leaving slow_residual()");
+		return std::sqrt(std::max(xtAtAx - 2*xtAtb + btb, 0.0)) / valueNorm_trainingSet;
 	}
 
 
 	void SALSA::solve_local() {
-		LOG(info, "Entering solve_local()");
-		//TODO: use only the training set for optimization
 		const size_t pos = x.corePosition;  //TODO: rename: position
-		const size_t l = x.get_component(pos).dimensions[0],
-					 e = x.get_component(pos).dimensions[1],
-					 r = x.get_component(pos).dimensions[2];
+		LOG(debug, "Entering solve_local(position=" << pos << ")");
 
-		//TODO: split N = Nt + Nv (train and validation)
-		Tensor op;
-		Tensor rhs;
-		if (pos == 0) {
-			op = Tensor({e,e,r,r}, Tensor::Representation::Dense);
-			rhs = Tensor({e,r}, Tensor::Representation::Dense);
-			Tensor tmp;
-			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
-			#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(trainingSet, e, pos) private(tmp) reduction(+:op,rhs)
-			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				contract(tmp, Tensor::identity({e,e}), rightStack[pos+1][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				op += tmp;
-
-				contract(tmp, values[i], rightStack[pos+1][i], 0);
-				rhs += tmp;
-			}
-			/* //TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen. */
-			reshuffle(op, op, {0,2,1,3});  // eerr -> erer
-			op.reinterpret_dimensions({1,e,r,1,e,r});
-			rhs.reinterpret_dimensions({1,e,r});
-		} else if (pos == 1) {
-			op = Tensor({e,r,e,r}, Tensor::Representation::Dense);
-			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
-			Tensor tmp;
-			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
-			#pragma omp parallel for default(none) shared(leftRHSStack, rightStack, measures) firstprivate(trainingSet, l, e, pos) private(tmp) reduction(+:op,rhs)
-			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				contract(tmp, measures[pos][i], rightStack[pos+1][i], 0);
-				contract(tmp, tmp, measures[pos][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				op += tmp;
-
-				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				rhs += tmp;
-			}
-			contract(op, Tensor::identity({l,l}), op, 0);  // leftLHSStack[pos-1][i] is the identity and the tensor product is a distributive binary operation
-			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
-		} else if (pos < M-1) {
-			op = Tensor({l,l,e,r,e,r}, Tensor::Representation::Dense);
-			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
-			Tensor tmp;
-			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(trainingSet, pos) private(tmp) reduction(+:op,rhs)
-			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				contract(tmp, tmp, measures[pos][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				/* REQUIRE(op.is_dense() && !op.has_factor() && op.get_internal_dense_data().unique(), "IE"); */
-				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
-				/* misc::add(op.get_dense_data(), tmp.get_dense_data(), tmp.size); */
-				op += tmp;
-
-				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
-				contract(tmp, tmp, rightStack[pos+1][i], 0);
-				/* REQUIRE(rhs.is_dense() && !rhs.has_factor() && rhs.get_internal_dense_data().unique(), "IE"); */
-				/* REQUIRE(tmp.is_dense() && !tmp.has_factor() && tmp.get_internal_dense_data().unique(), "IE"); */
-				/* misc::add(rhs.get_dense_data(), tmp.get_dense_data(), tmp.size); */
-				rhs += tmp;
-			}
-			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-			/* reshuffle(tmp, tmp, {0,3,1,4,2,5});  // lleerr -> lerler */
-			reshuffle(op, op, {0,3,1,2,4,5});  // llerer -> lerler
-		} else {
-			op = Tensor({l,l,e,e}, Tensor::Representation::Dense);
-			rhs = Tensor({l,e}, Tensor::Representation::Dense);
-			Tensor tmp;
-			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(trainingSet, pos, l, e) private(tmp) reduction(+:op,rhs)
-			for (size_t i=trainingSet.first; i<trainingSet.second; ++i) {
-				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
-				contract(tmp, tmp, measures[pos][i], 0);
-				op += tmp;
-
-				contract(tmp, leftRHSStack[pos-1][i], measures[pos][i], 0);
-				rhs += tmp;
-			}
-			//TODO: reshuffle funktioniert anders als in numpy! In numpy gibt die Liste an, wo die Indizes herkommen, hier gibt die Liste an, wo sie hingehen sollen.
-			reshuffle(op, op, {0,2,1,3});  // llee -> lele
-			op.reinterpret_dimensions({l,e,1,l,e,1});
-			rhs.reinterpret_dimensions({l,e,1});
-		}
-		REQUIRE(op.dimensions == Tensor::DimensionTuple({l,e,r, l,e,r}), "IE");  // In a macro you need parantheses around an initializer list.
-		REQUIRE(rhs.dimensions == Tensor::DimensionTuple({l,e,r}), "IE");
-
+		const auto[op, rhs] = ls_operator_and_rhs(trainingSet);
 		const Tensor op_alpha = alpha_operator();
 		const Tensor op_omega = omega_operator();
 
@@ -863,15 +798,14 @@ namespace xerus { namespace uq {
 			REQUIRE(basisWeights[m].dimensions == Tensor::DimensionTuple({x.dimensions[m], x.dimensions[m]}), "...");
 		}
 
-		// The sets have already been shuffled in the constructor. Now they need to be split.
-		size_t Nt = size_t((1.0-controlSetFraction)*double(N));
-		/* Nv = N - Nt; */
-		trainingSet = std::make_pair(0, Nt);
-		validationSet = std::make_pair(Nt, N);
-
 		// build stacks and compute left and right singular value arrays
 		x.move_core(x.order()-1);
 		while (x.corePosition > 0) { move_core_left(false); }
+
+		// The sets have already been shuffled in the constructor. Now they need to be split.
+		size_t Nt = size_t((1.0-controlSetFraction)*double(N));  // Nv = N - Nt;
+		trainingSet = std::make_pair(0, Nt);
+		validationSet = std::make_pair(Nt, N);
 
 		valueNorm_trainingSet = 0.0;
 		#pragma omp parallel for default(none) shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet)
@@ -890,11 +824,13 @@ namespace xerus { namespace uq {
 		// compute SALSA parameters
 		double res = residual(std::make_pair(0, N));
 		double maxResSqrtRes = std::max(res, std::sqrt(res));
-
 		alpha = alpha_factor * std::min(valueNorm_trainingSet, maxResSqrtRes);
 		omega = maxResSqrtRes;
 		smin = 0.2*std::min(omega, res);
 		omega *= omega_factor;
+
+		initialized = true;
+
 		LOG(debug, "Leaving initialize()");
 	}
 
@@ -935,24 +871,31 @@ namespace xerus { namespace uq {
 	void SALSA::run() {
 		LOG(debug, "Entering run()");
 		std::cout << std::string(125, '=') << '\n'
-					<< std::string(55, ' ') << "Running uqSALSA" << std::endl;
+				  << std::string(55, ' ') << "Running uqSALSA" << std::endl;
 		print_parameters();
+		REQUIRE(omega_factor > 0.0, "omega_factor must be positive");
+		REQUIRE(alpha_factor >= 0.0, "alpha_factor must be positive");
+		if (alpha_factor == 0.0) {
+			std::cout << "WARNING: Optimizing without l1 regularization" << std::endl;
+		}
 		initialize();
 
 		REQUIRE(x.corePosition == 0, "IE");
-		LOG(info, "Sweep: left --> right");
+		LOG(debug, "Sweep: left --> right");
 		for (size_t m=0; m<M-1; ++m) {
 			REQUIRE(x.corePosition == m, "IE");
-			LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
+			LOG(debug, "(ini)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 			solve_local();
 			move_core_right(false);
+			LOG(debug, "(fin)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 		}
-		LOG(info, "Sweep: right --> left");
+		LOG(debug, "Sweep: right --> left");
 		for (size_t m=M-1; m>0; --m) {
 			REQUIRE(x.corePosition == m, "IE");
-			LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
+			LOG(debug, "(ini)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 			solve_local();
 			move_core_left(false);
+			LOG(debug, "(fin)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 		}
 		REQUIRE(x.corePosition == 0, "IE");
 
@@ -969,12 +912,32 @@ namespace xerus { namespace uq {
 		bestValidationResidual = validationResiduals.back();
 		double prev_bestValidationResidual = validationResiduals.back();
 		/* double bestValidationResidual_cycle = bestValidationResidual; */
-		//TODO: der ganze best-kram (außer prev_bestValidationResidual) und initialResidual sollte vllt class attributes werden
 
 		size_t iteration = 0;
 		size_t nonImprovementCounter = 0;
 		bool omegaMinimal = false;
 
+		auto alpha_residual = [&](){
+			const Tensor op_alpha = alpha_operator();
+			const Tensor& core = x.get_component(x.corePosition);
+			const Tensor IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
+			Tensor ret;
+			contract(ret, core, IR, 3);
+			contract(ret, ret, op_alpha, 3);
+			contract(ret, ret, IR, 3);
+			contract(ret, ret, core, 3);
+			REQUIRE(ret.dimensions == Tensor::DimensionTuple({}), "IE");
+			return ret[0];
+		};
+		auto omega_residual = [&](){
+			const Tensor op_omega = omega_operator();
+			const Tensor& core = x.get_component(x.corePosition);
+			Tensor ret;
+			contract(ret, core, op_omega, 3);
+			contract(ret, ret, core, 3);
+			REQUIRE(ret.dimensions == Tensor::DimensionTuple({}), "IE");
+			return ret[0];
+		};
 		auto print_update = [&](){
 			auto update_str = [](double prev, double cur)  {
 				std::ostringstream ret;
@@ -983,29 +946,32 @@ namespace xerus { namespace uq {
 				return ret.str();
 			};
 			std::cout << "[" << iteration << "]"
-						<< "Residuals: trn=" << update_str(bestTrainingResidual , trainingResiduals.back())
-						<< ", val=" << update_str(bestValidationResidual , validationResiduals.back())
-						<< "  |  Omega: " << string_format("%.2e", omega)
-						<< "  |  Densities: " << print_densities();
+					  << " Cost:" << string_format("%.2e", trainingResiduals.back() + alpha_residual() + omega_residual())
+					  << "  |  Residuals: trn=" << update_str(bestTrainingResidual , trainingResiduals.back())
+					  << ", val=" << update_str(bestValidationResidual , validationResiduals.back())
+					  << "  |  Omega: " << string_format("%.2e", omega)
+					  << "  |  Densities: " << print_densities();
 			std::cout << "  |  Ranks: " << print_fractional_ranks() << std::endl;
 		};
 		print_update();
 
 		for (iteration=1; iteration<maxIterations; ++iteration) {
 			REQUIRE(x.corePosition == 0, "IE");
-			LOG(info, "Sweep: left --> right");
+			LOG(debug, "Sweep: left --> right");
 			for (size_t m=0; m<M-1; ++m) {
 				REQUIRE(x.corePosition == m, "IE");
-				LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
+				LOG(debug, "(ini)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 				solve_local();
 				move_core_right(true);
+				LOG(debug, "(fin)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 			}
-			LOG(info, "Sweep: right --> left");
+			LOG(debug, "Sweep: right --> left");
 			for (size_t m=M-1; m>0; --m) {
 				REQUIRE(x.corePosition == m, "IE");
-				LOG(info, "[corePosition=" << m << "] Residual: " << string_format("%.2e", slow_residual(trainingSet)));
+				LOG(debug, "(ini)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 				solve_local();
 				move_core_left(true);
+				LOG(debug, "(fin)[corePosition=" << m << "] Residual: " << string_format("%.8e", slow_residual(trainingSet)));
 			}
 			REQUIRE(x.corePosition == 0, "IE");
 
@@ -1058,12 +1024,14 @@ namespace xerus { namespace uq {
 
 				res = validationResiduals.back() * valueNorm_validationSet;
 				double prev_alpha = alpha;
-				alpha = alpha/alpha_factor;
-				alpha = std::min(alpha/falpha, std::sqrt(res));
-				alpha *= alpha_factor;
-				std::cout << "Reduce alpha: " << string_format("%.3f", prev_alpha);
-				std::cout << std::string(u8" \u2192 ");
-				std::cout << string_format("%.3f", alpha) << std::endl;
+				if (alpha_factor > 0.0) {
+					alpha = alpha/alpha_factor;
+					alpha = std::min(alpha/falpha, std::sqrt(res));
+					alpha *= alpha_factor;
+					std::cout << "Reduce alpha: " << string_format("%.3f", prev_alpha);
+					std::cout << std::string(u8" \u2192 ");
+					std::cout << string_format("%.3f", alpha) << std::endl;
+				} else { REQUIRE(alpha == 0.0, "IE"); }
 				//TODO: use disp_shortest_unequal(self.alpha, alpha)
 
 				trainingResiduals.clear();
