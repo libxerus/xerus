@@ -31,6 +31,9 @@
 
 #include <numeric>
 
+
+#define REVERSE_ACCESS(vector, index) vector[vector.size()-1-(index)]
+
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wsuggest-override"
 #pragma GCC diagnostic ignored "-Wold-style-cast"
@@ -82,13 +85,22 @@ namespace xerus { namespace uq {
 
 	std::vector<size_t> compute_max_theoretic_ranks(const std::vector<size_t>& _dimensions) {
 		// np.minimum(np.cumprod(d[:-1]), np.cumprod(d[:0:-1])[::-1])
-		std::vector<size_t> cumprod_left(_dimensions.size()-1);
-		std::inclusive_scan(_dimensions.begin(), _dimensions.end()-1,
-							cumprod_left.begin(), std::multiplies<>{});
+		const size_t M = _dimensions.size();
+		std::vector<size_t> cumprod_left(M-1);
+		/* std::inclusive_scan(_dimensions.begin(), _dimensions.end()-1, */
+		/*                     cumprod_left.begin(), std::multiplies<>{}); */
+		cumprod_left[0] = _dimensions[0];
+		for (size_t i=1; i<M-1; ++i) {
+			cumprod_left[i] = cumprod_left[i-1] * _dimensions[i];
+		}
 
-		std::vector<size_t> cumprod_right(_dimensions.size()-1);
-		std::inclusive_scan(_dimensions.rbegin(), _dimensions.rend()-1,
-							cumprod_right.rbegin(), std::multiplies<>{});
+		std::vector<size_t> cumprod_right(M-1);
+		/* std::inclusive_scan(_dimensions.rbegin(), _dimensions.rend()-1, */
+		/*                     cumprod_right.rbegin(), std::multiplies<>{}); */
+		REVERSE_ACCESS(cumprod_right, 0) = REVERSE_ACCESS(_dimensions, 0);
+		for (size_t i=1; i<_dimensions.size()-1; ++i) {
+			REVERSE_ACCESS(cumprod_right, i) = REVERSE_ACCESS(cumprod_right, i-1) * REVERSE_ACCESS(_dimensions, i);
+		}
 
 		std::vector<size_t> ranks;
 		std::transform(cumprod_left.begin(), cumprod_left.end(),
