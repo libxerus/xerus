@@ -37,8 +37,6 @@ namespace xerus { namespace uq {
         const size_t N;
         const size_t P;
 
-        const std::vector<size_t> maxTheoreticalRanks;
-
         double alpha, omega, smin;
 
         std::pair<size_t, size_t> trainingSet;
@@ -55,6 +53,8 @@ namespace xerus { namespace uq {
 
         std::vector<std::vector<double>> singularValues;
         std::vector<double> weightedNorms;  //TODO: rename: densities
+
+        std::vector<bool> maxIRstepsReached;
 
         bool initialized = false;
 

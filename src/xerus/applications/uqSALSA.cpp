@@ -83,6 +83,16 @@ namespace xerus { namespace uq {
 		return output;
 	}
 
+	std::string print_list(const size_t _size, const std::function<std::string(const size_t)>& _formatter) {
+		std::ostringstream stream;
+		for (size_t i=0; i<_size; ++i) {
+			stream << _formatter(i) << " ";
+		}
+		std::string output = "[" + stream.str();
+		output.replace(output.length()-1, 1, "]");
+		return output;
+	}
+
 	std::vector<size_t> compute_max_theoretic_ranks(const std::vector<size_t>& _dimensions) {
 		// np.minimum(np.cumprod(d[:-1]), np.cumprod(d[:0:-1])[::-1])
 		const size_t M = _dimensions.size();
@@ -174,8 +184,6 @@ namespace xerus { namespace uq {
 		N(_values.dimensions.at(0)),
 		P(_values.dimensions.at(1)),
 
-		maxTheoreticalRanks(compute_max_theoretic_ranks(x.dimensions)),
-
 		leftLHSStack(M, std::vector<Tensor>(N)),
 		leftRHSStack(M, std::vector<Tensor>(N)),
 		rightStack(M, std::vector<Tensor>(N)),
@@ -184,6 +192,8 @@ namespace xerus { namespace uq {
 
 		singularValues(M-1),
 		weightedNorms(M),
+
+		maxIRstepsReached(M),
 
 		maxRanks(M-1, std::numeric_limits<size_t>::max()),
 		basisWeights(ones(x.dimensions))
@@ -240,7 +250,8 @@ namespace xerus { namespace uq {
 
 		if (adapt) {
 			// adapt the rank (pos-1)--(pos) i.e. x.rank(pos-1)
-			size_t maxRank = std::min(std::max(maxRanks[pos-1], maxRanks[pos-1]+kmin), maxTheoreticalRanks[pos-1]);
+			size_t maxRank = std::min(maxRanks[pos-1], std::numeric_limits<size_t>::max()-kmin) + kmin;
+			REQUIRE(maxRank >= maxRanks[pos-1], "IE");
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(new_core, S, old_core, maxRank, threshold);
 			x.nodes[pos].neighbors[2].dimension = new_core.dimensions[2];
@@ -307,7 +318,8 @@ namespace xerus { namespace uq {
 
 		if (adapt) {
 			// adapt the rank (pos)--(pos+1) i.e. x.rank(pos)
-			size_t maxRank = std::min(std::max(maxRanks[pos], maxRanks[pos]+kmin), maxTheoreticalRanks[pos]);
+			size_t maxRank = std::min(maxRanks[pos], std::numeric_limits<size_t>::max()-kmin) + kmin;
+			REQUIRE(maxRank >= maxRanks[pos], "IE");
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(old_core, S, new_core, maxRank, threshold);
 			x.nodes[pos+1].neighbors[2].dimension = old_core.dimensions[2];
@@ -440,17 +452,17 @@ namespace xerus { namespace uq {
 	}
 
 	void SALSA::adapt_rank(Tensor& _U, Tensor& _S, Tensor& _Vt, const size_t _maxRank, const double _threshold) const {
-		//TODO: review again!
 		LOG(debug, "Entering adapt_rank(maxRank=" << _maxRank << ", threshold=" << string_format("%.2e", _threshold) << ")");
-		size_t eU = _U.order()-1; //TODO: rename
-		size_t eV = _Vt.order()-1;
+		const size_t eU = _U.order()-1; //TODO: rename
+		const size_t eV = _Vt.order()-1;
 		REQUIRE(_U.dimensions[eU] == _S.dimensions[0] &&  _S.dimensions[1] == _Vt.dimensions[0], "Inconsistent dimensions: " << _U.dimensions << " vs " << _S.dimensions << " vs " << _Vt.dimensions);
 
-		size_t rank, full_rank;
+		size_t rank;
 		for (rank=0; rank<_S.dimensions[0]; ++rank) {
 			if (_S[{rank,rank}] <= smin) break;
 		}
-		full_rank = std::min(rank+kmin, _maxRank);
+		size_t maxRank = std::min(_maxRank, std::min(_U.size/_U.dimensions[eU], _Vt.size/_Vt.dimensions[0]));
+		size_t full_rank = std::min(rank+kmin, maxRank);
 		LOG(debug, "rank=" << rank << "    full_rank=" << full_rank);
 
 		while (_S.dimensions[0] < full_rank) {
@@ -459,7 +471,7 @@ namespace xerus { namespace uq {
 			// Vtm,Vtn = Vt.dimensions[0], Vt.size/Vt.dimensions[0]
 			// The rank can only be increased when the dimensions of U and Vt allow it (Um > Un and Vtm < Vtn).
 			REQUIRE(_U.size > misc::sqr(_U.dimensions[eU]) && _Vt.size > misc::sqr(_Vt.dimensions[0]), "IE");
-			//NOTE: When called for a core move pos <--> pos+1 this condition is guaranteed by _maxRank <= maxTheoreticalRanks[pos].
+			//NOTE: This condition is guaranteed by maxRank <= std::min(_U.size/_U.dimensions[eU], _Vt.size/_Vt.dimensions[0]).
 
 			// Add a new diagonal entry with a value at 1% of the singular value threshold smin.
 			_S.resize_mode(0, _S.dimensions[0]+1);
@@ -482,12 +494,6 @@ namespace xerus { namespace uq {
 			slate -= tmp;
 			slate /= slate.frob_norm();
 
-			contract(tmp, slate, _U, eU);
-			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_U.dimensions[eU]}), "IE");
-			contract(tmp, _U, tmp, 1);
-			slate -= tmp;
-			slate /= slate.frob_norm();
-
 			slate_dimensions.push_back(1);
 			slate.reinterpret_dimensions(slate_dimensions);
 			slate_index = std::vector<size_t>(eU+1, 0); slate_index[eU] = _U.dimensions[eU]-1;
@@ -496,12 +502,6 @@ namespace xerus { namespace uq {
 			_Vt.resize_mode(0, _Vt.dimensions[0]+1);
 			slate_dimensions = std::vector<size_t>(_Vt.dimensions.cbegin()+1, _Vt.dimensions.cend());
 			slate = Tensor::random(slate_dimensions);
-			slate /= slate.frob_norm();
-
-			contract(tmp, _Vt, slate, eV);
-			REQUIRE(tmp.dimensions == Tensor::DimensionTuple({_Vt.dimensions[0]}), "IE");
-			contract(tmp, tmp, _Vt, 1);
-			slate -= tmp;
 			slate /= slate.frob_norm();
 
 			contract(tmp, _Vt, slate, eV);
@@ -740,7 +740,8 @@ namespace xerus { namespace uq {
 
 		// iterative reweighting
 		Tensor IR, op_IRalpha, prev_core;
-		for (size_t step=0; step<maxIRsteps; ++step) {
+		size_t step;
+		for (step=0; step<maxIRsteps; ++step) {
 			IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
 			contract(op_IRalpha, IR, op_alpha, 3);
 			contract(op_IRalpha, op_IRalpha, IR, 3);
@@ -748,6 +749,7 @@ namespace xerus { namespace uq {
 			solve(core, op+op_IRalpha+op_omega, rhs);
 			if (max_norm(prev_core - core) < IRtolerance*frob_norm(prev_core)) break;
 		}
+		maxIRstepsReached[pos] = (step == maxIRsteps);
 
 		size_t density = 0; // np.count_nonzero(abs(sol) > sparsityThreshold)/sol.size
 		#pragma omp parallel for default(none) firstprivate(core, sparsityThreshold) reduction(+:density)
@@ -851,8 +853,8 @@ namespace xerus { namespace uq {
 		/* assert len(self.singularValues) == self.x.order()-1 */
 		/* for i in range(self.x.order()-1): */
 		/*     assert len(self.singularValues[i]) == self.x.rank(i) */
-		const std::string grey_30 = u8"\033[38;5;239m";
-		const std::string grey_50 = u8"\033[38;5;244m";
+		const std::string dark_grey = u8"\033[38;5;242m";
+		const std::string light_grey = u8"\033[38;5;247m";
 		const std::string reset = u8"\033[0m";
 		std::string output = print_list<std::vector<double>>(singularValues, [&](const std::vector<double>& _sVs) {
 			/* assert np.all(_sVs > 0) */
@@ -865,7 +867,7 @@ namespace xerus { namespace uq {
 				inactive = _sVs[rank]/smin;
 				REQUIRE(0 < inactive && inactive < 1, "IE");
 			}
-			return std::to_string(rank) + "." + grey_50 + std::to_string(size_t(10*inactive)) + reset + u8"\u002F" + grey_30 + std::to_string(_sVs.size()) + reset;
+			return std::to_string(rank) + "." + light_grey + std::to_string(size_t(10*inactive)) + reset + u8"\u002F" + dark_grey + std::to_string(_sVs.size()) + reset;
 		});
 		LOG(debug, "Leaving print_fractional_ranks()");
 		return output;
@@ -873,8 +875,13 @@ namespace xerus { namespace uq {
 
 	std::string SALSA::print_densities() const {
 		LOG(debug, "Entering print_densities()");
-		std::string output = print_list<double>(weightedNorms, [](const double _norm) {  //TODO: rename
-			return string_format("%2u", std::min(size_t(100*_norm+0.5), size_t{99}));
+		const std::string yellow = u8"\033[38;5;230m";
+		const std::string reset = u8"\033[0m";
+		std::string output = print_list(M, [&](const size_t _index) {
+			if (maxIRstepsReached[_index]) {
+				return string_format(yellow+"%2u"+reset, std::min(size_t(100*weightedNorms[_index]+0.5), size_t{99}));
+			}
+			return string_format("%2u", std::min(size_t(100*weightedNorms[_index]+0.5), size_t{99}));
 		});
 		LOG(debug, "Leaving print_densities()");
 		return output + "%";
@@ -950,6 +957,9 @@ namespace xerus { namespace uq {
 			REQUIRE(ret.dimensions == Tensor::DimensionTuple({}), "IE");
 			return ret[0];
 		};
+		double costs = trainingResiduals.back() + alpha_residual() + omega_residual();
+		double bestCosts = costs;
+
 		auto print_update = [&](){
 			auto update_str = [](double prev, double cur)  {
 				std::ostringstream ret;
@@ -958,7 +968,7 @@ namespace xerus { namespace uq {
 				return ret.str();
 			};
 			std::cout << "[" << iteration << "]"
-					  << " Cost:" << string_format("%.2e", trainingResiduals.back() + alpha_residual() + omega_residual())
+					  << " Costs:" << update_str(bestCosts , costs)
 					  << "  |  Residuals: trn=" << update_str(bestTrainingResidual , trainingResiduals.back())
 					  << ", val=" << update_str(bestValidationResidual , validationResiduals.back())
 					  << "  |  Omega: " << string_format("%.2e", omega)
@@ -989,8 +999,10 @@ namespace xerus { namespace uq {
 
 			trainingResiduals.push_back(residual(trainingSet));
 			validationResiduals.push_back(residual(validationSet));
-			print_update();
 			bestTrainingResidual = std::min(trainingResiduals.back(), bestTrainingResidual);
+			costs = trainingResiduals.back() + alpha_residual() + omega_residual();
+			bestCosts = std::min(costs, bestCosts);
+			print_update();
 
 			if (validationResiduals.back() < (1-minDecrease)*bestValidationResidual) {
 				bestIteration = iteration;
@@ -1017,16 +1029,10 @@ namespace xerus { namespace uq {
 
 				if (bestIteration > iteration-validationResiduals.size()) {
 					nonImprovementCounter = 0;
-					std::cout << "NonImpCnt: " << nonImprovementCounter << string_format(" (val=%.2e ", prev_bestValidationResidual);
-					std::cout << std::string(u8"\u2198");
-					std::cout << string_format(" val=%.2e)", bestValidationResidual) << std::endl;
+					std::cout << string_format(u8"NonImpCnt: %d (val=%.2e \u2198 val=%.2e)", nonImprovementCounter, prev_bestValidationResidual, bestValidationResidual) << std::endl;
 				} else {
 					nonImprovementCounter += 1;
-					/* nonImpCnt_str = f"NonImpCnt: {{0:{len(str(self.maxNonImprovingAlphaCycles))}d}}".format */
-					/* print(nonImpCnt_str(nonImprovementCounter), f"(val={bestValidationResidual:.2e} \u2197 val={min(validationResiduals):.2e})")  #  Best validation residual: {...}. */
-					std::cout << "NonImpCnt: " << nonImprovementCounter << string_format(" (val=%.2e ", prev_bestValidationResidual);
-					std::cout << std::string(u8"\u2197");
-					std::cout << string_format(" val=%.2e)", bestValidationResidual) << std::endl;
+					std::cout << string_format(u8"NonImpCnt: %d (val=%.2e \u2192)", nonImprovementCounter, bestValidationResidual) << std::endl;
 				}
 
 				if (nonImprovementCounter >= maxNonImprovingAlphaCycles) {
