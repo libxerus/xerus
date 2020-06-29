@@ -752,7 +752,7 @@ namespace xerus { namespace uq {
 		Tensor IR, op_IRalpha, prev_core;
 		size_t step;
 		for (step=0; step<maxIRsteps; ++step) {
-			IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
+			IR = diag(core, [this](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
 			contract(op_IRalpha, IR, op_alpha, 3);
 			contract(op_IRalpha, op_IRalpha, IR, 3);
 			prev_core = core;
@@ -906,9 +906,13 @@ namespace xerus { namespace uq {
 		print_parameters();
 		REQUIRE(omega_factor > 0.0, "omega_factor must be positive");
 		REQUIRE(alpha_factor >= 0.0, "alpha_factor must be positive");
+
+		#pragma GCC diagnostic push
+		#pragma GCC diagnostic ignored "-Wfloat-equal"
 		if (alpha_factor == 0.0) {
 			std::cout << "WARNING: Optimizing without l1 regularization" << std::endl;
 		}
+		#pragma GCC diagnostic pop
 		initialize();
 
 		REQUIRE(x.corePosition == 0, "IE");
@@ -951,7 +955,7 @@ namespace xerus { namespace uq {
 		auto alpha_residual = [&](){
 			const Tensor op_alpha = alpha_operator();
 			const Tensor& core = x.get_component(x.corePosition);
-			const Tensor IR = diag(core, [sparsityThreshold=sparsityThreshold](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
+			const Tensor IR = diag(core, [this](double _entry) { return 1.0/std::sqrt(std::max(std::abs(_entry), sparsityThreshold)); });
 			Tensor ret;
 			contract(ret, core, IR, 3);
 			contract(ret, ret, op_alpha, 3);
@@ -1061,7 +1065,12 @@ namespace xerus { namespace uq {
 					std::cout << "Reduce alpha: " << string_format("%.3f", prev_alpha);
 					std::cout << std::string(u8" \u2192 ");
 					std::cout << string_format("%.3f", alpha) << std::endl;
-				} else { REQUIRE(alpha == 0.0, "IE"); }
+				} else {
+					#pragma GCC diagnostic push
+					#pragma GCC diagnostic ignored "-Wfloat-equal"
+					REQUIRE(alpha == 0.0, "IE");
+					#pragma GCC diagnostic pop
+				}
 				//TODO: use disp_shortest_unequal(self.alpha, alpha)
 
 				trainingResiduals.clear();
