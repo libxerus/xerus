@@ -531,7 +531,7 @@ namespace xerus { namespace uq {
 	}
 
 	double SALSA::residual(const std::pair<size_t, size_t>& _slice) const {
-		const auto [from, to] = _slice;
+		const size_t from = _slice.first, to = _slice.second;
 		LOG(debug, "Entering residual((" << from << ", " << to << "))");
 		REQUIRE(x.corePosition == 0, "IE");
 		REQUIRE(from <= to && to <= N, "IE");
@@ -716,7 +716,12 @@ namespace xerus { namespace uq {
 		LOG(debug, "Entering slow_residual((" << _slice.first << ", " << _slice.second << "))");
 
 		const Tensor& core = x.get_component(x.corePosition);
-		const auto[A, b] = ls_operator_and_rhs(_slice);
+		#if __cplusplus >= 201402L
+			const auto[A, b] = ls_operator_and_rhs(_slice);
+		#else
+			Tensor A,b;
+			std::tie(A,b) = ls_operator_and_rhs(_slice);
+		#endif
 
 		const double xtAtAx = contract(contract(core, A, 3), core, 3)[0];
 		const double xtAtb  = contract(core, b, 3)[0];
@@ -731,7 +736,12 @@ namespace xerus { namespace uq {
 		const size_t pos = x.corePosition;  //TODO: rename: position
 		LOG(debug, "Entering solve_local(position=" << pos << ")");
 
-		const auto[op, rhs] = ls_operator_and_rhs(trainingSet);
+		#if __cplusplus >= 201402L
+			const auto[op, rhs] = ls_operator_and_rhs(trainingSet);
+		#else
+			Tensor op,rhs;
+			std::tie(op,rhs) = ls_operator_and_rhs(trainingSet);
+		#endif
 		const Tensor op_alpha = alpha_operator();
 		const Tensor op_omega = omega_operator();
 
@@ -763,42 +773,44 @@ namespace xerus { namespace uq {
 
 	void SALSA::print_parameters() const {
 		LOG(debug, "Entering print_parameters()");
-		const size_t max_param_len = 26;  // "maxNonImprovingAlphaCycles".size()
-		const auto print_param = [max_param_len](std::string name, auto value) {
-			const std::string pad(max_param_len-name.length(), ' ');
-			std::cout << "  " << name << " = " << pad << value << "\n";
-		};
 		const std::string sep = std::string(125, '-')+"\n";
 		std::cout << sep;
-		print_param("dimensions", print_list(x.dimensions));
-		print_param("initial_ranks", print_list(x.ranks()));
-		print_param("num_samples", N);
-		std::cout << sep;
-		print_param("controlSetFraction", controlSetFraction);
-		std::cout << '\n';
-		print_param("targetResidual", targetResidual);
-		std::cout << '\n';
-		print_param("minDecrease", minDecrease);
-		print_param("maxIterations", maxIterations);
-		print_param("trackingPeriodLength", trackingPeriodLength);
-		print_param("maxNonImprovingAlphaCycles", maxNonImprovingAlphaCycles);
-		std::cout << '\n';
-		print_param("maxIRsteps", maxIRsteps);
-		print_param("IRtolerance", IRtolerance);
-		print_param("sparsityThreshold", sparsityThreshold);
-		std::cout << '\n';
-		print_param("kmin", kmin);
-		print_param("maxRanks", print_list<size_t>(maxRanks, [](const size_t _rank) -> std::string {
-			if (_rank == std::numeric_limits<size_t>::max()) { return u8"\u221e"; }
-			return std::to_string(_rank);
-		}));
-		std::cout << '\n';
-		print_param("fomega", fomega);
-		print_param("omega_factor", omega_factor);
-		std::cout << '\n';
-		print_param("falpha", falpha);
-		print_param("alpha_factor", alpha_factor);
-		std::cout << sep;
+		#if __cplusplus >= 201402L
+			const size_t max_param_len = 26;  // "maxNonImprovingAlphaCycles".size()
+			const auto print_param = [max_param_len](std::string name, auto value) {
+				const std::string pad(max_param_len-name.length(), ' ');
+				std::cout << "  " << name << " = " << pad << value << "\n";
+			};
+			print_param("dimensions", print_list(x.dimensions));
+			print_param("initial_ranks", print_list(x.ranks()));
+			print_param("num_samples", N);
+			std::cout << sep;
+			print_param("controlSetFraction", controlSetFraction);
+			std::cout << '\n';
+			print_param("targetResidual", targetResidual);
+			std::cout << '\n';
+			print_param("minDecrease", minDecrease);
+			print_param("maxIterations", maxIterations);
+			print_param("trackingPeriodLength", trackingPeriodLength);
+			print_param("maxNonImprovingAlphaCycles", maxNonImprovingAlphaCycles);
+			std::cout << '\n';
+			print_param("maxIRsteps", maxIRsteps);
+			print_param("IRtolerance", IRtolerance);
+			print_param("sparsityThreshold", sparsityThreshold);
+			std::cout << '\n';
+			print_param("kmin", kmin);
+			print_param("maxRanks", print_list<size_t>(maxRanks, [](const size_t _rank) -> std::string {
+				if (_rank == std::numeric_limits<size_t>::max()) { return u8"\u221e"; }
+				return std::to_string(_rank);
+			}));
+			std::cout << '\n';
+			print_param("fomega", fomega);
+			print_param("omega_factor", omega_factor);
+			std::cout << '\n';
+			print_param("falpha", falpha);
+			print_param("alpha_factor", alpha_factor);
+			std::cout << sep;
+		#endif
 		LOG(debug, "Leaving print_parameters()");
 	}
 
