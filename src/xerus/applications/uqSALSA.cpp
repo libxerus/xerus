@@ -291,6 +291,7 @@ namespace xerus { namespace uq {
 		Tensor& new_core = x.component(pos-1);
 		Tensor U,S,Vt;
 
+		// move the core (pos-1)<--(pos) i.e. adapt x.rank(pos-1)
 		calculate_svd(U, S, Vt, old_core, 1, 0, 0);
 		// splitPos == 1 --> U(left,r1) * S(r1,r2) * Vt(r2,ext,right) == old_core(left,ext,right)   (The left part has 1 external index.)
 		// maxRank == 0  --> do not perform hard thresholding
@@ -302,17 +303,16 @@ namespace xerus { namespace uq {
 		contract(new_core, new_core, U, 1);  // new_core(i^2,j) << new_core(i^2,l) * U(l,j)
 
 		if (adapt) {
-			// adapt the rank (pos-1)--(pos) i.e. x.rank(pos-1)
 			size_t maxRank = std::min(maxRanks[pos-1], std::numeric_limits<size_t>::max()-kmin) + kmin;
 			REQUIRE(maxRank >= maxRanks[pos-1], "IE");
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(new_core, S, old_core, maxRank, threshold);
-			x.nodes[pos].neighbors[2].dimension = new_core.dimensions[2];
-			x.nodes[pos+1].neighbors[0].dimension = old_core.dimensions[0];
 		}
 
 		contract(new_core, new_core, S, 1);  // new_core(i^2,j) << new_core(i^2,l) * S(l,j)
 		REQUIRE(new_core.all_entries_valid() && old_core.all_entries_valid(), "IE");
+		x.nodes[pos].neighbors[2].dimension = new_core.dimensions[2];
+		x.nodes[pos+1].neighbors[0].dimension = old_core.dimensions[0];
 		x.assume_core_position(pos-1);
 
 		calc_right_stack(pos);
@@ -324,11 +324,23 @@ namespace xerus { namespace uq {
 
 		if (initialized && 1 < pos) {
 			Tensor& next_core = x.component(pos-2);
+			// move the core (pos-2)<--(pos-1) i.e. adapt x.rank(pos-1)
 			calculate_svd(U, S, Vt, new_core, 1, 0, 0);  // (U(left,r1), S(r1,r2), Vt(r2,ext,right)) = new_core(left,ext,right)
-			REQUIRE(U.order() == 2 && U.dimensions[0] == U.dimensions[1], "IE");
+			// REQUIRE(U.order() == 2 && U.dimensions[0] == U.dimensions[1], "IE(" << pos << ") " << new_core.dimensions << " / " << U.dimensions << " / " << S.dimensions << " / " << Vt.dimensions);
+			//TODO: This is not the case when new_core has a rank that is lower than new_core.dimenions[0].
+			REQUIRE(U.order() == 2, "IE");
+			if (U.dimensions[0] != U.dimensions[1]) {
+				REQUIRE(U.dimensions[0] > U.dimensions[1], "IE");
+				std::cout << "WARNING: Real rank(" << pos-2 << ") is " << U.dimensions[1] << " and not " << U.dimensions[0] << '\n';
+			}
 
 			contract(next_core, next_core, U, 1);
+			contract(new_core, S, Vt, 1);
+			REQUIRE(new_core.all_entries_valid() && next_core.all_entries_valid(), "IE");
+			x.nodes[pos-1].neighbors[2].dimension = next_core.dimensions[2];
+			x.nodes[pos].neighbors[0].dimension = new_core.dimensions[0];
 
+			calc_left_stack(pos-2);
 			// You could also contract U directly to the operator in solve_local:
 			// Then you would minimize `(U@core).T @ op @ (U@core) - (U@core).T @ rhs` for `core`.
 			// The problem with that is that the operator is large and multiplication of U requires a reshuffling of its modes (in this case: lerler --> lererl).
@@ -340,12 +352,8 @@ namespace xerus { namespace uq {
 			//TODO: A similar strategy: Do not reshuffle the operator but just the RHS: (op : reller, rhs : ler) and let R be the reshuffling operator: (rel -> ler) the you would solve R@op@x == rhs.
 			//      But you can also solve op@x == inv(R)@rhs!
 			//TODO: Beide Ideen funktionieren deswegen nicht so gut, weil wir dann auch alpha_op und omega_op anpassen müssten. (Eigentlich nur omega_op und der ist sparse...)
-
-			contract(new_core, S, Vt, 1);
-			REQUIRE(new_core.all_entries_valid() && next_core.all_entries_valid(), "IE");
-
-			calc_left_stack(pos-2);
-			//TODO: Diese Beschreibeung (mit Vt) ist für move_core_right.
+			//
+			//TODO: Die folgende Beschreibeung (mit Vt) ist für move_core_right.
 			//TODO: Das muss nicht sein.
 			//      Du kannst Vt auch einfach als `rightOrthogonalTransfrom` speichern.
 			//      Nach der Berechnung der RHS und des Op werden `leftOrthogonalTransform` und `rightOrthogonalTransform` ranmultipliziert.
@@ -380,6 +388,7 @@ namespace xerus { namespace uq {
 		Tensor& new_core = x.component(pos+1);
 		Tensor U,S,Vt;
 
+		// move the core (pos)-->(pos+1) i.e. adapt x.rank(pos)
 		calculate_svd(U, S, Vt, old_core, 2, 0, 0);  // (U(left,ext,r1), S(r1,r2), Vt(r2,right)) = old_core(left,ext,right)
 		REQUIRE(Tensor::DimensionTuple(U.dimensions.begin(), U.dimensions.end()-1) == Tensor::DimensionTuple(old_core.dimensions.begin(), old_core.dimensions.begin()+2), "IE");
 		REQUIRE(Tensor::DimensionTuple(Vt.dimensions.begin()+1, Vt.dimensions.end()) == Tensor::DimensionTuple(old_core.dimensions.begin()+2, old_core.dimensions.end()), "IE");
@@ -388,17 +397,16 @@ namespace xerus { namespace uq {
 		contract(new_core, Vt, new_core, 1);  // new_core(i,j^2) << Vt(i,r) * new_core(r,j^2)
 
 		if (adapt) {
-			// adapt the rank (pos)--(pos+1) i.e. x.rank(pos)
 			size_t maxRank = std::min(maxRanks[pos], std::numeric_limits<size_t>::max()-kmin) + kmin;
 			REQUIRE(maxRank >= maxRanks[pos], "IE");
 			double threshold = 0.1*smin;  //TODO: in the unchecked (i.e. commented out) version of vresalsa threshold = 0.1*self.residual(self.trainingSet)
 			adapt_rank(old_core, S, new_core, maxRank, threshold);
-			x.nodes[pos+1].neighbors[2].dimension = old_core.dimensions[2];
-			x.nodes[pos+2].neighbors[0].dimension = new_core.dimensions[0];
 		}
 
 		contract(new_core, S, new_core, 1);  // new_core(i,j^2) << S(i,l) * new_core(l,j^2)
 		REQUIRE(new_core.all_entries_valid() && old_core.all_entries_valid(), "IE");
+		x.nodes[pos+1].neighbors[2].dimension = old_core.dimensions[2];
+		x.nodes[pos+2].neighbors[0].dimension = new_core.dimensions[0];
 		x.assume_core_position(pos+1);
 
 		calc_left_stack(pos);
@@ -410,11 +418,21 @@ namespace xerus { namespace uq {
 
 		if (pos+2 < x.order()) {
 			Tensor& next_core = x.component(pos+2);
+			// move the core (pos+1)-->(pos+2) i.e. adapt x.rank(pos+1)
 			calculate_svd(U, S, Vt, new_core, 2, 0, 0);  // (U(left,ext,r1), S(r1,r2), Vt(r2,right)) = new_core(left,ext,right)
-			REQUIRE(Vt.order() == 2 && Vt.dimensions[0] == Vt.dimensions[1], "IE");
+			// REQUIRE(Vt.order() == 2 && Vt.dimensions[0] == Vt.dimensions[1], "IE");
+			//TODO: This is not the case when new_core has a rank that is lower than new_core.dimenions[2].
+			REQUIRE(Vt.order() == 2, "IE");
+			if (Vt.dimensions[0] != Vt.dimensions[1]) {
+				REQUIRE(Vt.dimensions[0] < Vt.dimensions[1], "IE");
+				std::cout << "WARNING: Real rank(" << pos+1 << ") is " << Vt.dimensions[0] << " and not " << Vt.dimensions[1] << std::endl;
+			}
+
 			contract(next_core, Vt, next_core, 1);
 			contract(new_core, U, S, 1);
 			REQUIRE(new_core.all_entries_valid() && next_core.all_entries_valid(), "IE");
+			x.nodes[pos+2].neighbors[2].dimension = new_core.dimensions[2];
+			x.nodes[pos+3].neighbors[0].dimension = next_core.dimensions[0];
 
 			calc_right_stack(pos+2);  //TODO: see move_core_left
 
