@@ -66,9 +66,9 @@ namespace xerus { namespace uq {
 
         // Stagnation/Divergence parameters
         double minDecrease = 1e-3;
-        size_t maxIterations = 1000;
+        size_t maxSweeps = 1000;
         size_t trackingPeriodLength = 10;
-        size_t maxNonImprovingAlphaCycles = 10;
+        size_t maxStagnatingEpochs = 10;
 
         // Inactive rank parameters
         size_t kmin = 2;
@@ -81,11 +81,11 @@ namespace xerus { namespace uq {
 
         // SALSA parameters
         double fomega = 1.05;
-        double omega_factor = 1;
+        double omegaFactor = 1;
 
         // LASSO parameters
         double falpha = 1.05;
-        double alpha_factor = 1;
+        double alphaFactor = 1;
         std::vector<Tensor> basisWeights;
 
         /* // Reweighting parameters */
@@ -93,9 +93,14 @@ namespace xerus { namespace uq {
 
         double initialResidual;  //TODO: rename
         size_t bestIteration;
-        TTTensor bestX;
-        double bestTrainingResidual;
-        double bestValidationResidual;
+
+	struct State {
+		double alpha;
+		double omega;
+		TTTensor x;
+		double trainingResidual;
+		double validationResidual;
+	} bestState;
 
         SALSA(const TTTensor& _x, const std::vector<Tensor>& _measures, const Tensor& _values);
         void run();

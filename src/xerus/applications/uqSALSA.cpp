@@ -34,19 +34,6 @@
 #include <numeric>
 #include <chrono>
 
-class Timer {
-	using Clock    = std::chrono::high_resolution_clock;
-	using Millisecond = std::chrono::duration<double, std::ratio<1,1000>>;
-	std::chrono::time_point<Clock> start;
-
-public:
-	Timer() : start(Clock::now()) {}
-	void reset() { start = Clock::now(); }
-	double elapsed() const {
-		return std::chrono::duration_cast<Millisecond>(Clock::now() - start).count();
-	}
-};
-
 #define likely(x)   __builtin_expect(!!(x), 1)
 #define unlikely(x) __builtin_expect(!!(x), 0)
 
@@ -74,6 +61,46 @@ public:
 
 
 namespace xerus { namespace uq {
+
+	// constexpr std::size_t operator "" z(unsigned long long n) { return n; }  // size_t literal
+
+	class Timer {
+		using Clock    = std::chrono::high_resolution_clock;
+		using Millisecond = std::chrono::duration<double, std::ratio<1,1000>>;
+		std::chrono::time_point<Clock> start;
+
+	public:
+		Timer() : start(Clock::now()) {}
+		void reset() { start = Clock::now(); }
+		double elapsed() const {
+			return std::chrono::duration_cast<Millisecond>(Clock::now() - start).count();
+		}
+	};
+
+	struct Foreground {
+		static const std::string Good;
+		static const std::string Bad;
+		static const std::string Alert;
+		static const std::string Separate;
+		static const std::string Reset;
+
+		static const int GrayscaleBegin;
+		static const int GrayscaleEnd;
+
+		static auto Gray(const double _value) {
+			REQUIRE(0 <= _value && _value <= 1, "_value must lie between 0 and 1");
+			const auto gsb = static_cast<int>(GrayscaleBegin);
+			const auto gse = static_cast<int>(GrayscaleEnd);
+			return "\033[38;5;" + std::to_string(gsb + int(_value*(gse-gsb))) + "m";
+		}
+	};
+	const std::string Foreground::Good     = "\033[38;5;151m";
+	const std::string Foreground::Bad      = "\033[38;5;181m";
+	const std::string Foreground::Alert    = "\033[38;5;230m";
+	const std::string Foreground::Separate = "\033[38;5;153m";
+	const std::string Foreground::Reset    = "\033[39m";
+	const int Foreground::GrayscaleBegin = 236;
+	const int Foreground::GrayscaleEnd = 256;
 
 	template<typename ... Args>
 	std::string string_format( const std::string& format, Args ... args )
@@ -918,6 +945,8 @@ namespace xerus { namespace uq {
 		/* LOG(profiling, "Leaving ls_operator()"); */
 		/* const double elapsed = timer.elapsed(); */
 		/* std::cout << string_format("Time for ls_operator_and_rhs(position=%d): %.2fms\n", pos, elapsed); */
+		op /= misc::sqr(valueNorm_trainingSet);   //TODO: is this a good idea?
+		rhs /= misc::sqr(valueNorm_trainingSet);  //TODO: is this a good idea?
 		return std::make_pair(op, rhs);
 	}
 
@@ -997,9 +1026,11 @@ namespace xerus { namespace uq {
 	void SALSA::print_parameters() const {
 		LOG(debug, "Entering print_parameters()");
 		const std::string sep = std::string(125, '-')+"\n";
+		std::cout << std::string(125, '=') << '\n'
+			  << std::string(55, ' ') << "Running uqSALSA" << std::endl;
 		std::cout << sep;
 		#if __cplusplus >= 201402L
-			const size_t max_param_len = 26;  // "maxNonImprovingAlphaCycles".size()
+			const size_t max_param_len = 20;  // "trackingPeriodLength".size()
 			const auto print_param = [max_param_len](std::string name, auto value) {
 				const std::string pad(max_param_len-name.length(), ' ');
 				std::cout << "  " << name << " = " << pad << value << "\n";
@@ -1024,9 +1055,9 @@ namespace xerus { namespace uq {
 			print_param("targetResidual", targetResidual);
 			std::cout << '\n';
 			print_param("minDecrease", minDecrease);
-			print_param("maxIterations", maxIterations);
+			print_param("maxSweeps", maxSweeps);
 			print_param("trackingPeriodLength", trackingPeriodLength);
-			print_param("maxNonImprovingAlphaCycles", maxNonImprovingAlphaCycles);
+			print_param("maxStagnatingEpochs", maxStagnatingEpochs);
 			std::cout << '\n';
 			print_param("maxIRsteps", maxIRsteps);
 			print_param("IRtolerance", IRtolerance);
@@ -1039,12 +1070,13 @@ namespace xerus { namespace uq {
 			}));
 			std::cout << '\n';
 			print_param("fomega", fomega);
-			print_param("omega_factor", omega_factor);
+			print_param("omegaFactor", omegaFactor);
 			std::cout << '\n';
 			print_param("falpha", falpha);
-			print_param("alpha_factor", alpha_factor);
+			print_param("alphaFactor", alphaFactor);
 			std::cout << sep;
 		#endif
+		std::cout << std::flush;  // Make sure the user does not have to wait for the first sweep to complete.
 		LOG(debug, "Leaving print_parameters()");
 	}
 
@@ -1086,12 +1118,17 @@ namespace xerus { namespace uq {
 		valueNorm_validationSet = std::sqrt(valueNorm_validationSet);
 
 		// compute SALSA parameters
-		double res = residual(std::make_pair(0, N));
-		double maxResSqrtRes = std::max(res, std::sqrt(res));
-		alpha = alpha_factor * std::min(valueNorm_trainingSet, maxResSqrtRes);
+		const auto res = residual(std::make_pair(0, N));
+		const auto maxResSqrtRes = std::max(res, std::sqrt(res));
+		// alpha and omega should be of the same order as the residual.
+		// This ensures that the regularization terms initially dominate the cost and can promote generalization.
+		// Since alpha enters the cost functional squared we want to choose alpha = omega = std::sqrt(res).
+		//TODO: But when res is larger than 1 this is smaller than res and therefore we take the std::max. (Why is this important?)
+		// alpha = alphaFactor * std::min(valueNorm_trainingSet, maxResSqrtRes);
+		alpha = alphaFactor * maxResSqrtRes;
 		omega = maxResSqrtRes;
 		smin = 0.2*std::min(omega, res);
-		omega *= omega_factor;
+		omega *= omegaFactor;
 
 		initialized = true;
 
@@ -1103,21 +1140,18 @@ namespace xerus { namespace uq {
 		/* assert len(self.singularValues) == self.x.order()-1 */
 		/* for i in range(self.x.order()-1): */
 		/*     assert len(self.singularValues[i]) == self.x.rank(i) */
-		const std::string dark_grey = u8"\033[38;5;242m";
-		const std::string light_grey = u8"\033[38;5;247m";
-		const std::string reset = u8"\033[0m";
 		std::string output = print_list<std::vector<double>>(singularValues, [&](const std::vector<double>& _sVs) {
 			/* assert np.all(_sVs > 0) */
 			size_t rank;
 			for (rank=0; rank<_sVs.size(); ++rank) {
 				if (_sVs[rank] <= smin) break;
 			}
-			double inactive = 0.0;
+			double inactive = 0.0f;
 			if (rank < _sVs.size()) {
 				inactive = _sVs[rank]/smin;
-				REQUIRE(0 < inactive && inactive < 1, "IE");
+				REQUIRE(0.0f <= inactive && inactive < 1.0f, "IE: " << inactive);
 			}
-			return std::to_string(rank) + "." + light_grey + std::to_string(size_t(10*inactive)) + reset + u8"\u002F" + dark_grey + std::to_string(_sVs.size()) + reset;
+			return std::to_string(rank) + "." + Foreground::Gray(inactive) + std::to_string(unsigned(10.0f*inactive)) + Foreground::Reset + u8"\u002F" + Foreground::Separate + std::to_string(_sVs.size()) + Foreground::Reset;
 		});
 		LOG(debug, "Leaving print_fractional_ranks()");
 		return output;
@@ -1125,11 +1159,9 @@ namespace xerus { namespace uq {
 
 	std::string SALSA::print_densities() const {
 		LOG(debug, "Entering print_densities()");
-		const std::string yellow = u8"\033[38;5;230m";
-		const std::string reset = u8"\033[0m";
 		const std::string output = print_list(M, [&](const size_t _index) {
 			if (maxIRstepsReached[_index]) {
-				return string_format(yellow+"%2u"+reset, std::min(size_t(100*weightedNorms[_index]+0.5), size_t{99}));
+				return string_format(Foreground::Alert + "%2u" + Foreground::Reset, std::min(size_t(100*weightedNorms[_index]+0.5), size_t{99}));
 			}
 			return string_format("%2u", std::min(size_t(100*weightedNorms[_index]+0.5), size_t{99}));
 		});
@@ -1139,45 +1171,50 @@ namespace xerus { namespace uq {
 
 	void SALSA::run() {
 		LOG(debug, "Entering run()");
-		std::cout << std::string(125, '=') << '\n'
-				  << std::string(55, ' ') << "Running uqSALSA" << std::endl;
-		print_parameters();
-		REQUIRE(omega_factor > 0.0, "omega_factor must be positive");
-		REQUIRE(alpha_factor >= 0.0, "alpha_factor must be positive");
+		REQUIRE(omegaFactor > 0.0, "omegaFactor must be positive");
+		REQUIRE(alphaFactor >= 0.0, "alphaFactor must be non-negative");
 
-		if (misc::hard_equal(alpha_factor, 0.0)) {
+		print_parameters();
+		if (misc::hard_equal(alphaFactor, 0.0)) {
 			std::cout << "WARNING: Optimizing without l1 regularization" << std::endl;
 		}
 		initialize();
 
+		const auto perform_sweep = [&](const bool _adapt) {
+			// std::cerr << "perform_sweep(start)" << std::endl;
+			REQUIRE(x.corePosition == 0, "IE");
+			LOG(debug, "Sweep: left --> right");
+			for (size_t m=0; m<M-1; ++m) {
+				// std::cerr << "perform_sweep(" << m << ")" << std::endl;
+				REQUIRE(x.corePosition == m, "IE");
+				solve_local();
+				move_core_right(_adapt);
+			}
+			LOG(debug, "Sweep: right --> left");
+			for (size_t m=M-1; m>0; --m) {
+				// std::cerr << "perform_sweep(" << m << ")" << std::endl;
+				REQUIRE(x.corePosition == m, "IE");
+				solve_local();
+				move_core_left(_adapt);
+			}
+			// std::cerr << "perform_sweep(end)" << std::endl;
+			REQUIRE(x.corePosition == 0, "IE");
+		};
+
 		#if !defined(PROFILING)
-		REQUIRE(x.corePosition == 0, "IE");
-		LOG(debug, "Sweep: left --> right");
-		for (size_t m=0; m<M-1; ++m) {
-			REQUIRE(x.corePosition == m, "IE");
-			solve_local();
-			move_core_right(false);
-		}
-		LOG(debug, "Sweep: right --> left");
-		for (size_t m=M-1; m>0; --m) {
-			REQUIRE(x.corePosition == m, "IE");
-			solve_local();
-			move_core_left(false);
-		}
-		REQUIRE(x.corePosition == 0, "IE");
+			perform_sweep(false);
 		#endif
 
 		boost::circular_buffer<double> trainingResiduals{trackingPeriodLength};
-		std::vector<double> validationResiduals;
 		trainingResiduals.push_back(residual(trainingSet));
+		auto bestTrainingResidual = trainingResiduals.back();
+		std::vector<double> validationResiduals;
 		validationResiduals.push_back(residual(validationSet));
 
 		initialResidual = trainingResiduals.back();  //TODO: rename
 		bestIteration = 0;
-		bestX = x;
-		bestTrainingResidual = trainingResiduals.back();
-		bestValidationResidual = validationResiduals.back();
 		double prev_bestValidationResidual = validationResiduals.back();
+		bestState = State{alpha, omega, x, trainingResiduals.back(), validationResiduals.back()};
 
 		size_t iteration = 0;
 		size_t nonImprovementCounter = 0;
@@ -1193,7 +1230,7 @@ namespace xerus { namespace uq {
 			contract(ret, ret, IR, 3);
 			contract(ret, ret, core, 3);
 			REQUIRE(ret.dimensions == Tensor::DimensionTuple({}), "IE");
-			return ret[0];
+			return misc::sqr(alpha)*ret[0];
 		};
 		auto omega_residual = [&](){
 			const Tensor op_omega = omega_operator();
@@ -1202,57 +1239,65 @@ namespace xerus { namespace uq {
 			contract(ret, core, op_omega, 3);
 			contract(ret, ret, core, 3);
 			REQUIRE(ret.dimensions == Tensor::DimensionTuple({}), "IE");
-			return ret[0];
+			return misc::sqr(omega)*ret[0];
 		};
-		double costs = trainingResiduals.back() + alpha_residual() + omega_residual();
-		double bestCosts = costs;
+		auto alphaCosts = alpha_residual();
+		auto bestAlphaCosts = alphaCosts;
+		auto omegaCosts = omega_residual();
+		auto bestOmegaCosts = omegaCosts;
+		auto totalCosts = trainingResiduals.back() + alphaCosts + omegaCosts;
+		auto bestTotalCosts = totalCosts;
 
-		auto print_update = [&](){
-			auto update_str = [](double prev, double cur)  {
+		auto print_update = [&](const bool improvement){
+			const auto update_str = [](const double prev, const double cur)  {
 				std::ostringstream ret;
-				if (cur <= prev+1e-8) ret << "\033[38;5;151m" << string_format("%.2e", cur) << "\033[0m";
-				else ret << "\033[38;5;181m" << string_format("%.2e", cur) << "\033[0m";
+				if (cur <= prev+1e-8) { ret << Foreground::Good; }
+				else { ret << Foreground::Bad; }
+				ret << string_format("%.2e", cur) << Foreground::Reset;
 				return ret.str();
 			};
-			std::cout << "[" << iteration << "]"
-					  << " Costs:" << update_str(bestCosts , costs)
-					  << "  |  Residuals: trn=" << update_str(bestTrainingResidual , trainingResiduals.back())
-					  << ", val=" << update_str(bestValidationResidual , validationResiduals.back())
-					  << "  |  Omega: " << string_format("%.2e", omega)
-					  << "  |  Densities: " << print_densities();
-			std::cout << "  |  Ranks: " << print_fractional_ranks() << std::endl;
+			const auto attr = [](const unsigned _code) -> std::string { return u8"\033["+std::to_string(_code)+"m"; };
+			const auto reset = attr(0);
+			const auto bold = attr(1);
+			if (improvement) { std::cout << bold; }
+			std::cout << "[" << iteration << "] Costs:"
+				  << " LS="		 << update_str(bestTrainingResidual , trainingResiduals.back())
+				  << u8", R\u03B1=" 	 << update_str(bestAlphaCosts, alphaCosts)
+				  << u8", R\u03C9=" 	 << update_str(bestOmegaCosts, omegaCosts)
+				  << "  |  Validation: " << update_str(bestState.validationResidual , validationResiduals.back())
+				  << "  |  \u03C9: " << string_format("%.2e", omega)
+				  << "  |  Densities: " << print_densities()
+			      	  << "  |  Ranks: " << print_fractional_ranks() << reset << std::endl;  // Flush to ensure that the user does not have to wait for other sweeps to complete
 		};
-		print_update();
+		print_update(true);
 
-		for (iteration=1; iteration<maxIterations; ++iteration) {
-			REQUIRE(x.corePosition == 0, "IE");
-			LOG(debug, "Sweep: left --> right");
-			for (size_t m=0; m<M-1; ++m) {
-				REQUIRE(x.corePosition == m, "IE");
-				solve_local();
-				move_core_right(true);
-			}
-			LOG(debug, "Sweep: right --> left");
-			for (size_t m=M-1; m>0; --m) {
-				REQUIRE(x.corePosition == m, "IE");
-				solve_local();
-				move_core_left(true);
-			}
-			REQUIRE(x.corePosition == 0, "IE");
+		for (iteration=1; iteration<maxSweeps; ++iteration) {
+			// std::cerr << iteration << " (0)" << std::endl;
+			perform_sweep(true);
 
 			trainingResiduals.push_back(residual(trainingSet));
+			alphaCosts = alpha_residual();
+			omegaCosts = omega_residual();
+			totalCosts = trainingResiduals.back() + alphaCosts + omegaCosts;
 			validationResiduals.push_back(residual(validationSet));
-			bestTrainingResidual = std::min(trainingResiduals.back(), bestTrainingResidual);
-			costs = trainingResiduals.back() + alpha_residual() + omega_residual();
-			bestCosts = std::min(costs, bestCosts);
-			print_update();
+			// std::cerr << iteration << " (2)" << std::endl;
 
-			if (validationResiduals.back() < (1-minDecrease)*bestValidationResidual) {
+			// check if the validation residual decreased in a meaningful way during the last sweep
+			const bool sweepImprovement = validationResiduals.back() < (1-minDecrease)*bestState.validationResidual;
+			print_update(sweepImprovement);
+
+			bestTrainingResidual = std::min(trainingResiduals.back(), bestTrainingResidual);
+			bestAlphaCosts = std::min(alphaCosts, bestAlphaCosts);
+			bestOmegaCosts = std::min(omegaCosts, bestOmegaCosts);
+			bestTotalCosts = std::min(totalCosts, bestTotalCosts);
+			if (sweepImprovement) {
 				bestIteration = iteration;
-				bestX = x;
-				prev_bestValidationResidual = bestValidationResidual;
-				bestValidationResidual = validationResiduals.back();
-				bestTrainingResidual = trainingResiduals.back();
+				prev_bestValidationResidual = bestState.validationResidual;
+				bestState = State{alpha, omega, x, trainingResiduals.back(), validationResiduals.back()};
+				// bestX = x;
+				// prev_bestValidationResidual = bestValidationResidual;
+				// bestValidationResidual = validationResiduals.back();
+				// bestTrainingResidual = trainingResiduals.back();
 			}
 
 			if (validationResiduals.back() < targetResidual) {
@@ -1260,47 +1305,69 @@ namespace xerus { namespace uq {
 				break;
 			}
 
-			double res = trainingResiduals.back();
-			omega /= omega_factor;
-			omega = std::max(std::min(omega/fomega, std::sqrt(res)), res);
-			omegaMinimal = misc::approx_equal(omega, res, 1e-6);
+			auto res = trainingResiduals.back();
+			omega /= omegaFactor;
+			// omega = std::max(std::min(omega/fomega, std::sqrt(res)), res);
+			omega = std::min(omega/fomega, std::max(res, std::sqrt(res)));
+			omegaMinimal = omega <= res+1e-6; // misc::approx_equal(omega, res, 1e-6);
 			smin = 0.2*std::min(omega, res);
-			omega *= omega_factor;
+			omega *= omegaFactor;
 
-			if (trainingResiduals.size() >= trackingPeriodLength && trainingResiduals.back() > (1-minDecrease)*trainingResiduals.front() && omegaMinimal) {
-				REQUIRE(trainingResiduals.size() == trackingPeriodLength, "IE"); // circular buffer...
+			// std::cerr << iteration << " (5)" << std::endl;
 
-				if (bestIteration > iteration-validationResiduals.size()) {
+			// check for stagnation in the training residual (trainingResiduals is a circular buffer)
+			const bool stagnation = trainingResiduals.size() == trackingPeriodLength && trainingResiduals.back() > (1-minDecrease)*trainingResiduals.front() && omegaMinimal;
+			if (stagnation) {
+				// check if the best validation residual decreased while minimizing with this alpha (validationResiduals contains all validation residuals since this alpha was chosen)
+				const bool epochImprovement = bestIteration+validationResiduals.size() > iteration;
+				if (epochImprovement) {
 					nonImprovementCounter = 0;
-					std::cout << string_format(u8"NonImpCnt: %d (val=%.2e \u2198 val=%.2e)", nonImprovementCounter, prev_bestValidationResidual, bestValidationResidual) << std::endl;
+					std::cout << string_format(u8"Epochs with stagnating validation residual: %d (val=%.2e \u2198 val=%.2e)", nonImprovementCounter, prev_bestValidationResidual, bestState.validationResidual) << std::endl;
 				} else {
 					nonImprovementCounter += 1;
-					std::cout << string_format(u8"NonImpCnt: %d (val=%.2e \u2192)", nonImprovementCounter, bestValidationResidual) << std::endl;
+					std::cout << string_format(u8"Epochs with stagnating validation residual: %d (val=%.2e \u2192)", nonImprovementCounter, bestState.validationResidual) << std::endl;
 				}
-
-				if (nonImprovementCounter >= maxNonImprovingAlphaCycles) {
+				// check termination criterion
+				if (nonImprovementCounter >= maxStagnatingEpochs) {
 					std::cout << "Terminating: Minimum residual decrease deceeded " << nonImprovementCounter << " iterations in a row." << std::endl;
 					break;
 				}
 
-				res = validationResiduals.back() * valueNorm_validationSet;
-				double prev_alpha = alpha;
-				if (alpha_factor > 0.0) {
-					alpha = alpha/alpha_factor;
-					alpha = std::min(alpha/falpha, std::sqrt(res));
-					alpha *= alpha_factor;
-					std::cout << "Reduce alpha: " << string_format("%.3f", prev_alpha);
-					std::cout << std::string(u8" \u2192 ");
-					std::cout << string_format("%.3f", alpha) << std::endl;
-				} else { REQUIRE(misc::hard_equal(alpha, 0.0), "IE"); }
-				//TODO: use disp_shortest_unequal(self.alpha, alpha)
+			    	// adapt alpha
+				if (alphaFactor > 0.0) {
+					const auto prev_alpha = alpha;
+					// Select omega and x from the most recent optimal state.
+					//TODO: come up with a better name than alpha-cycle
+					// Note that alpha may be lower than bestState.alpha if one (alpha-)cycle of optimization did not result in a sufficient reduction of the validation resiudal.
+					omega = bestState.omega;
+					smin = 0.2*std::min(omega/omegaFactor, res);
+					// x = TTTensor(bestState.x);  //TODO: Why is this explicit copy necessary?
+					x = bestState.x;
+					REQUIRE(x.corePosition == 0, "IE");
+					// reinitialize right stack
+					initialized = false;
+					x.move_core(x.order()-1);
+					while (x.corePosition > 0) { move_core_left(false); }
+					initialized = true;
+					res = std::sqrt(misc::sqr(bestState.trainingResidual) + misc::sqr(bestState.validationResidual));
+					// res = validationResiduals.back() * valueNorm_validationSet;
+					alpha /= alphaFactor;
+					alpha = std::min(alpha/falpha, std::max(res, std::sqrt(res)));
+					alpha *= alphaFactor;
 
+					//TODO: use disp_shortest_unequal(self.alpha, alpha)
+					std::cout << "Reduce \u03B1: " << string_format("%.3f", prev_alpha)
+					          << std::string(u8" \u2192 ")
+					          << string_format("%.3f", alpha) << std::endl;
+				} else { REQUIRE(misc::hard_equal(alpha, 0.0), "IE"); }
+
+				// clear buffers to ensure that they contain only values for the current choice of alpha
 				trainingResiduals.clear();
-				validationResiduals.clear();  // This reset is part of the nonImprovementCounter strategy.
+				validationResiduals.clear();
 			}
 		}
 
-		if (iteration == maxIterations) {
+		if (iteration == maxSweeps) {
 			std::cout << "Terminating: Maximum iterations reached." << std::endl;
 		}
 
