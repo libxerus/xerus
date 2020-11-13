@@ -358,7 +358,10 @@ namespace xerus { namespace uq {
 			REQUIRE(U.order() == 2, "IE");
 			if (U.dimensions[0] != U.dimensions[1]) {
 				REQUIRE(U.dimensions[0] > U.dimensions[1], "IE");
-				std::cout << Foreground::Alert + "WARNING: Real rank(" << pos-2 << ") is " << U.dimensions[1] << " and not " << U.dimensions[0] << Foreground::Reset + "\n";
+				const auto attr = [](const unsigned _code) -> std::string { return u8"\033["+std::to_string(_code)+"m"; };
+				const auto alert = Foreground::Alert + attr(1);
+				const auto reset = attr(0);
+				std::cout << alert + "WARNING: Real rank(" << pos-2 << ") is " << U.dimensions[1] << " and not " << U.dimensions[0] << reset + "\n";
 			}
 
 			contract(next_core, next_core, U, 1);
@@ -452,7 +455,10 @@ namespace xerus { namespace uq {
 			REQUIRE(Vt.order() == 2, "IE");
 			if (Vt.dimensions[0] != Vt.dimensions[1]) {
 				REQUIRE(Vt.dimensions[0] < Vt.dimensions[1], "IE");
-				std::cout << Foreground::Alert + "WARNING: Real rank(" << pos+1 << ") is " << Vt.dimensions[0] << " and not " << Vt.dimensions[1] << Foreground::Reset + "\n";
+				const auto attr = [](const unsigned _code) -> std::string { return u8"\033["+std::to_string(_code)+"m"; };
+				const auto alert = Foreground::Alert + attr(1);
+				const auto reset = attr(0);
+				std::cout << alert + "WARNING: Real rank(" << pos+1 << ") is " << Vt.dimensions[0] << " and not " << Vt.dimensions[1] << reset + "\n";
 			}
 
 			contract(next_core, Vt, next_core, 1);
@@ -1176,7 +1182,10 @@ namespace xerus { namespace uq {
 
 		print_parameters();
 		if (!misc::hard_equal(alphaFactor, 0.0)) {
-			std::cout << Foreground::Alert + "WARNING: Optimizing with l1 regularization is an experimental feature" + Foreground::Reset + "\n";
+			const auto attr = [](const unsigned _code) -> std::string { return u8"\033["+std::to_string(_code)+"m"; };
+			const auto alert = Foreground::Alert + attr(1);
+			const auto reset = attr(0);
+			std::cout << alert + "WARNING: Optimizing with l1 regularization is an experimental feature" + reset + "\n";
 		}
 		initialize();
 
@@ -1257,13 +1266,13 @@ namespace xerus { namespace uq {
 			const auto bold = attr(1);
 			if (improvement) { std::cout << bold; }
 			std::cout << "[" << iteration << "] Costs:"
-                                  << " LS="              << update_str(bestTrainingResidual , trainingResiduals.back())
-                                  << u8", R\u03B1="      << update_str(bestAlphaCosts, alphaCosts)
-                                  << u8", R\u03C9="      << update_str(bestOmegaCosts, omegaCosts)
-                                  << "  |  Validation: " << update_str(bestState.validationResidual , validationResiduals.back())
-                                  << "  |  \u03C9: "     << string_format("%.2e", omega)
-                                  << "  |  Densities: "  << print_densities()
-                                  << "  |  Ranks: "      << print_fractional_ranks() << reset << std::endl;  // Flush to ensure that the user does not have to wait for other sweeps to complete
+								  << " LS="              << update_str(bestTrainingResidual , trainingResiduals.back())
+								  << u8", R\u03B1="      << update_str(bestAlphaCosts, alphaCosts)
+								  << u8", R\u03C9="      << update_str(bestOmegaCosts, omegaCosts)
+								  << "  |  Validation: " << update_str(bestState.validationResidual , validationResiduals.back())
+								  << "  |  \u03C9: "     << string_format("%.2e", omega)
+								  << "  |  Densities: "  << print_densities()
+								  << "  |  Ranks: "      << print_fractional_ranks() << reset << std::endl;  // Flush to ensure that the user does not have to wait for other sweeps to complete
 		};
 		print_update(true);
 
@@ -1345,8 +1354,8 @@ namespace xerus { namespace uq {
 
 					//TODO: use disp_shortest_unequal(self.alpha, alpha)
 					std::cout << "Reduce \u03B1: " << string_format("%.3f", prev_alpha)
-					          << std::string(u8" \u2192 ")
-					          << string_format("%.3f", alpha) << std::endl;
+							  << std::string(u8" \u2192 ")
+							  << string_format("%.3f", alpha) << std::endl;
 				} else { REQUIRE(misc::hard_equal(alpha, 0.0), "IE"); }
 
 				// clear buffers to ensure that they contain only values for the current choice of alpha
@@ -1360,8 +1369,8 @@ namespace xerus { namespace uq {
 		}
 
 		std::cout << "Best validation residual in iteration " << bestIteration << ".\n"
-                          << std::string(125, '-') << '\n'
-                          << "Truncating inactive singular values." << std::endl;
+						  << std::string(125, '-') << '\n'
+						  << "Truncating inactive singular values." << std::endl;
 
 		size_t rank;
 		for (size_t m=0; m<M-1; ++m) {
@@ -1369,7 +1378,10 @@ namespace xerus { namespace uq {
 				if (singularValues[m][rank] <= smin) break;
 			}
 			if (rank > maxRanks[m]) {
-				std::cout << Foreground::Alert + "WARNING: maxRanks[" << m << "] = " << maxRanks[m] << " was reached during optimization." + Foreground::Reset + "\n";
+				const auto attr = [](const unsigned _code) -> std::string { return u8"\033["+std::to_string(_code)+"m"; };
+				const auto alert = Foreground::Alert + attr(1);
+				const auto reset = attr(0);
+				std::cout << alert + "WARNING: maxRanks[" << m << "] = " << maxRanks[m] << " was reached during optimization." + reset + "\n";
 			}
 		}
 
