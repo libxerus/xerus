@@ -79,6 +79,14 @@ void expose_ttnetwork(module& m) {
 	m.def("dyadic_product", static_cast<TTTensor (*)(const std::vector<TTTensor> &)>(&dyadic_product));
 
 	class_<TTOperator, TensorNetwork>(m, "TTOperator")
+		.def(pickle(
+			[](const TTTensor &_self) { // __getstate__
+				return bytes(misc::serialize(_self));
+			},
+			[](bytes _bytes) { // __setstate__
+				return misc::deserialize<TTTensor>(_bytes);
+			}
+		))
 		.def(init<const Tensor&>())
 		.def(init<const Tensor&, value_t>())
 		.def(init<const Tensor&, value_t, size_t>())
