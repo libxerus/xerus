@@ -31,14 +31,7 @@ ln -s ${PREFIX}/include/ ${PREFIX}/include/suitesparse
 make python
 ${PYTHON} -m pip install . --no-deps -vv
 
-# INCLUDE_PATH="${PREFIX}/include"
-# mkdir -p ${INCLUDE_PATH}
-# cp include/xerus.h ${INCLUDE_PATH}
-# cp -r include/xerus ${INCLUDE_PATH}
-
-# LIBRARY_PATH="${PREFIX}/lib"
-# mkdir -p ${LIBRARY_PATH}
-# cp build/libxerus.so ${LIBRARY_PATH}
-# cp build/libxerus_misc.so ${LIBRARY_PATH}
-
-rm config.mk
+# cp include/xerus.h ${PREFIX}/include/
+# cp -r include/xerus ${PREFIX}/include/
+# cp build/libxerus.so ${PREFIX}/lib/
+# cp build/libxerus_misc.so ${PREFIX}/lib/
