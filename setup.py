@@ -12,7 +12,8 @@ setuptools.setup(
 	long_description_content_type="text/markdown",
 	url="https://libxerus.org",
 	packages=['xerus'],
-	package_data={'xerus': ['*.so']},
+	# package_data={'xerus': ['*.so']},
+	package_data={'xerus': ['xerus.so']},
 	classifiers=[
 		"Programming Language :: Python :: 3",
 		"License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",

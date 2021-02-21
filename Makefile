@@ -228,14 +228,15 @@ build/libxerus.so: $(MINIMAL_DEPS) $(XERUS_SOURCES) $(XERUS_INCLUDES) build/libx
 	$(CXX) -shared -fPIC -Wl,-soname,libxerus.so $(FLAGS) -I include $(XERUS_SOURCES) -L ./build/ -Wl,--as-needed -lxerus_misc $(SUITESPARSE) $(LAPACK_LIBRARIES) $(ARPACK_LIBRARIES) $(BLAS_LIBRARIES) -o build/libxerus.so
 
 
-python: xerus/xerus.so xerus/libxerus.so xerus/libxerus_misc.so
+# python: xerus/xerus.so xerus/libxerus.so xerus/libxerus_misc.so
+python: xerus/xerus.so
 
 xerus/xerus.so: build/python3/xerus.so
 	cp $< $@
-xerus/libxerus.so: build/libxerus.so
-	cp $< $@
-xerus/libxerus_misc.so: build/libxerus_misc.so
-	cp $< $@
+# xerus/libxerus.so: build/libxerus.so
+# 	cp $< $@
+# xerus/libxerus_misc.so: build/libxerus_misc.so
+# 	cp $< $@
 
 build/python3/xerus.so: $(MINIMAL_DEPS) $(PYTHON_SOURCES) src/xerus/python/misc.h build/libxerus.so
 	@:$(call check_defined, PYTHON3_CONFIG, include and link paths)

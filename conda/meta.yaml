@@ -1,6 +1,6 @@
 {% set name = "Xerus" %}
 {% set version = "4.0.1" %}
-{% set branch = "SALSA" %}
+{% set branch = "conda" %}
 
 package:
   name: {{ name|lower + '_' + branch|lower }}
@@ -14,23 +14,32 @@ source:
 build:
   number: 1
   skip: true       # [py<34 or win]
+  run_exports:
+    strong:
+      - python
+      - numpy
+      - openblas
+      - suitesparse
+      - lapack
+      - liblapacke
+      - boost-cpp
+      - libgomp
 
 requirements:
   build:
     - {{ compiler('cxx') }}
     - make
-    - {{ pin_compatible('python', max_pin='x.x') }}
+    - python {{ python }}
     - pip >=18.1
   host:
     - python
-    - {{ pin_compatible('numpy') }}
-    - {{ pin_compatible('openblas', max_pin='x.x') }}
-    - {{ pin_compatible('suitesparse', max_pin='x.x') }}
-    - {{ pin_compatible('lapack') }}
-    - {{ pin_compatible('liblapacke') }}
-    - {{ pin_compatible('boost-cpp', max_pin='x.x.x') }}
-    - {{ pin_compatible('llvm-openmp') }}  # [osx]
-    - {{ pin_compatible('libgomp') }}      # [linux]
+    - numpy
+    - openblas
+    - suitesparse
+    - lapack
+    - liblapacke
+    - boost-cpp
+    - libgomp
   run:
     - python
     - numpy
@@ -38,13 +47,8 @@ requirements:
     - suitesparse
     - lapack
     - liblapacke
-    # - boost-cpp >=1.69.0  # boost-cpp: boost without python
-    - boost-cpp    # boost-cpp: boost without python
-    - llvm-openmp  # [osx]
-    - libgomp      # [linux]
-    # #- gdb           # bfd
-    # #- backward-cpp  # option for better python-like backtraces
-  # run:
+    - boost-cpp
+    - libgomp
 
 test:
   # requires:
