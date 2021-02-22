@@ -26,13 +26,13 @@ BOOST_LIBS = -lboost_filesystem
 OTHER += -I${PREFIX}/include -I${PREFIX}/lib/python${PY_VER}/site-packages/numpy/core/include/
 OTHER += -L${PREFIX}/lib
 EOF
+ln -s ${PREFIX}/include/ ${PREFIX}/include/suitesparse
 
+make shared
 cp include/xerus.h ${PREFIX}/include/
 cp -r include/xerus ${PREFIX}/include/
 cp build/libxerus.so ${PREFIX}/lib/
 cp build/libxerus_misc.so ${PREFIX}/lib/
 
-ln -s ${PREFIX}/include/ ${PREFIX}/include/suitesparse
 make python
 ${PYTHON} -m pip install . --no-deps -vv
-
