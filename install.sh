@@ -1,11 +1,13 @@
 #!/bin/bash
 ENVNAME="${1:-${CONDA_DEFAULT_ENV}}"
+BRANCHNAME="${2:-conda}"
 set -e
 
 if [ -z "${ENVNAME}" ];
 then
-    echo "Usage: bash install.sh [<environment>]"
+    echo "Usage: bash install.sh [<environment>] [<branch>]"
     echo "       If <environment> is not provided the current conda environment will be used."
+    echo "       If <branch> is not provided the conda branch will be used."
     exit 0
 fi
 
@@ -33,7 +35,10 @@ conda install -c conda-forge python pip python_abi gxx_linux-64 make numpy openb
 NUMPY=${CONDA_PREFIX}/lib/python3.8/site-packages/numpy
 CXX=${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-c++
 
-git clone --recurse-submodules https://github.com/libxerus/xerus.git --branch SALSA
+cd /tmp
+TEMPDIR=$(mktemp -d)
+cd ${TEMPDIR}
+git clone --recurse-submodules https://github.com/libxerus/xerus.git --branch ${BRANCHNAME}
 cd xerus
 
 cat <<EOF >config.mk
@@ -63,5 +68,5 @@ ln -s ${CONDA_PREFIX}/include/ ${CONDA_PREFIX}/include/suitesparse
 make python
 python -m pip install . --no-deps -vv
 
-cd ..
-rm -rf xerus
+cd ../..
+rm -rf ${TEMPDIR}/xerus
