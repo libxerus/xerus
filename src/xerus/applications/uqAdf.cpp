@@ -495,7 +495,6 @@ namespace xerus { namespace uq { namespace impl_uqRaAdf {
 					if (new_res > res) {
 						LOG(uqADF, "Warning: relative residuum increased by " << std::scientific << (new_res - res)/res);
 					}
-					REQUIRE(new_res - res < res, "IE: relative increase in residuum by more than 1: " << std::scientific << (new_res - res)/res);
 				}
 			}
 		}
