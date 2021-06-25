@@ -27,13 +27,15 @@ then
     esac
 fi
 
-echo "Installing XERUS into environment: ${ENVNAME}"
+echo "Installing branch 'xerus/${BRANCHNAME}' into environment '${ENVNAME}'."
 
 conda activate ${ENVNAME}
 conda install -c conda-forge python pip python_abi gxx_linux-64 make numpy openblas suitesparse lapack liblapacke boost-cpp libgomp scipy matplotlib rich
+pip install python-config
 
-NUMPY=${CONDA_PREFIX}/lib/python3.8/site-packages/numpy
 CXX=${CONDA_PREFIX}/bin/x86_64-conda-linux-gnu-c++
+NUMPY=$(python -c 'import numpy as np; print("/".join(np.__file__.split("/")[:-1]))')
+XERUS=$(python -c 'import numpy as np; print("/".join(np.__file__.split("/")[:-2]))')/xerus.so
 
 cd /tmp
 TEMPDIR=$(mktemp -d)
@@ -64,9 +66,14 @@ OTHER += -I${CONDA_PREFIX}/include -I${NUMPY}/core/include/
 OTHER += -L${CONDA_PREFIX}/lib
 EOF
 
-ln -s ${CONDA_PREFIX}/include/ ${CONDA_PREFIX}/include/suitesparse
+if [ ! -d ${CONDA_PREFIX}/include/suitesparse ];
+then
+    ln -s ${CONDA_PREFIX}/include/ ${CONDA_PREFIX}/include/suitesparse
+fi
 make python
-python -m pip install . --no-deps -vv
+cp build/libxerus_misc.so ${CONDA_PREFIX}/lib/
+cp build/libxerus.so ${CONDA_PREFIX}/lib/
+cp build/python3/xerus.so ${XERUS}
 
 cd ../..
 rm -rf ${TEMPDIR}/xerus
