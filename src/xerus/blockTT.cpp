@@ -307,4 +307,76 @@ namespace xerus { namespace internal {
         return true;
     }
 
+
+    value_t move_block(BlockTT& _x, const size_t _position, const size_t _maxRank) { // , const Tensor& _grad, const std::function<value_t (const Tensor& _cutoff)> _hessRes) {
+        REQUIRE(_x.blockPosition == _x.corePosition, "core must be at block position");
+        REQUIRE(_maxRank > 0, "maxRank must be larger than zero.");
+        REQUIRE(_position < _x.degree(), "IE");
+        Tensor U, S, V;
+        value_t ret = 0; // corePosition == _position
+
+        const Index left, ext, p, right, r1, r2;
+        auto& corePosition = _x.corePosition;
+        auto& blockPosition = _x.blockPosition;
+        auto& components = _x.components;
+
+        while(corePosition < _position) { // To right
+            const Tensor& X = components[corePosition];
+            ret = calculate_svd(U, S, V, X, 2, _maxRank, .0);
+
+            components[corePosition] = U;
+            components[corePosition+1](left, ext, p, right) = S(left, r1)*V(r1, p, r2)*components[corePosition+1](r2, ext, right);
+            corePosition++;
+            blockPosition++;
+        }
+
+        while(corePosition > _position) { // To left
+            const Tensor X = reshuffle(components[corePosition], {0,2,1,3});
+            ret = calculate_svd(U, S, V, X, 2, _maxRank, .0);
+
+            components[corePosition] = V;
+            components[corePosition-1](left, ext, p, right) = components[corePosition-1](left, ext, r1)*U(r1, p, r2)*S(r2, right);
+            corePosition--;
+            blockPosition--;
+        }
+
+        return ret;
+    }
+
+    value_t move_core(BlockTT& _x, const size_t _position, const size_t _maxRank) {
+        REQUIRE(_maxRank > 0, "maxRank must be larger than zero.");
+        REQUIRE(_position < _x.degree(), "IE");
+        Tensor U, S, V;
+        value_t ret = 0; // corePosition == _position
+
+        const Index left, aux, right, r1, r2;
+        auto& corePosition = _x.corePosition;
+        auto& blockPosition = _x.blockPosition;
+        auto& components = _x.components;
+
+        while(corePosition < _position) { // To right
+            const Tensor& X = components[corePosition];
+            const size_t isBlock = (corePosition == blockPosition);
+            ret = calculate_svd(U, S, V, X, 2+isBlock, _maxRank, .0);
+
+            components[corePosition] = U;
+            components[corePosition+1](left, aux&2, right) = S(left, r1)*V(r1, r2)*components[corePosition+1](r2, aux&2, right);
+            corePosition++;
+        }
+
+        while(corePosition > _position) { // To left
+            const Tensor& X = components[corePosition];
+            ret = calculate_svd(U, S, V, X, 1, _maxRank, .0);
+
+            components[corePosition] = V;
+            components[corePosition-1](left, aux&2, right) = components[corePosition-1](left, aux&2, r1)*U(r1, r2)*S(r2, right);
+            corePosition--;
+        }
+
+        return ret;
+    }
+
+
+
+
 } } // namespace xerus

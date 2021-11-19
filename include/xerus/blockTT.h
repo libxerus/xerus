@@ -27,8 +27,14 @@
 #include "tensor.h"
 #include "tensorNetwork.h"
 #include "ttNetwork.h"
+#include "misc/check.h"
 
 namespace xerus { namespace internal {
+
+    class BlockTT;
+    value_t move_block(BlockTT& _x, const size_t _position, const size_t _maxRank = ~0U);
+    value_t move_core(BlockTT& _x, const size_t _position, const size_t _maxRank = ~0U);
+
     /**
      * @brief Specialized TensorNetwork class used to represent a BlockTT
      */
@@ -137,8 +143,53 @@ namespace xerus { namespace internal {
             */
             void move_core(const size_t _position, const double _eps=EPSILON, const size_t _maxRank=std::numeric_limits<size_t>::max());
             value_t move_core(const size_t _position, const size_t _maxRank);
-            
-            
+
+            template<class distribution=std::normal_distribution<value_t>, class generator=std::mt19937_64>
+            static BlockTT random(const std::vector<size_t> _dimensions, const std::vector<size_t> &_ranks, const size_t _blockPosition, const size_t _blockDim, distribution& _dist=xerus::misc::defaultNormalDistribution, generator& _rnd=xerus::misc::randomEngine) {
+            /* template<class distribution, class generator> */
+            /* BlockTT BlockTT::random(const std::vector<size_t> _dimensions, const std::vector<size_t> &_ranks, const size_t _blockPosition, const size_t _blockDim, distribution& _dist, generator& _rnd) { */
+                const size_t numComponents = _dimensions.size();
+                XERUS_REQUIRE(_ranks.size()+1 == numComponents,"Non-matching amount of ranks given to BlockTT::random.");
+                XERUS_REQUIRE(!misc::contains(_dimensions, size_t(0)), "Trying to construct a BlockTT-Tensor with dimension 0 is not possible.");
+                XERUS_REQUIRE(!misc::contains(_ranks, size_t(0)), "Trying to construct random BlockTT-Tensor with rank 0 is illegal.");
+                XERUS_REQUIRE(_blockPosition < _dimensions.size(), "_blockPosition >= _dimensions.size()");
+
+                BlockTT result(_dimensions, _ranks, _blockPosition, _blockDim);
+                result.corePosition=0;
+
+                for(size_t i = 0; i < numComponents; ++i) {
+                    std::vector<size_t> cmpDims;
+                    if (i == _blockPosition) {
+                        cmpDims.reserve(4);
+                        cmpDims.push_back((i>0) ? _ranks[i-1] : 1);
+                        cmpDims.push_back(_dimensions[i]);
+                        cmpDims.push_back(_blockDim);
+                        cmpDims.push_back((i<numComponents-1) ? _ranks[i] : 1);
+                    }
+                    else {
+                        cmpDims.reserve(3);
+                        cmpDims.push_back((i>0) ? _ranks[i-1] : 1);
+                        cmpDims.push_back(_dimensions[i]);
+                        cmpDims.push_back((i<numComponents-1) ? _ranks[i] : 1);
+                    }
+
+                    const auto rndComp = Tensor::random(cmpDims, _dist, _rnd);
+                    result.set_component(i, rndComp);
+                    if (i < numComponents-1) xerus::internal::move_core(result, i+1);
+                    /* result.components[i] = rndComp; */
+                }
+
+                /* result.corePosition = _dimensions.size()-1; */
+                /* result.move_core(0); */
+                xerus::internal::move_core(result, _blockPosition);
+                return result;
+            }
+
+            /* template<class distribution=std::normal_distribution<value_t>, class generator=std::mt19937_64> */
+            /* BlockTT random(const std::vector<size_t>& _dimensions, const size_t _rank, distribution& _dist, generator& _rnd) { */
+            /*     return TTNetwork::random(_dimensions, std::vector<size_t>(_dimensions.size()-1, _rank), _dist, _rnd); */
+            /* } */
+
             void average_core();
 
             bool all_entries_valid() const;
