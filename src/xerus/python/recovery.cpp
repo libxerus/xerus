@@ -154,5 +154,40 @@ void expose_recoveryAlgorithms(module& m) {
 		.value("Hermite", uq::PolynomBasis::Hermite)
 		.value("Legendre", uq::PolynomBasis::Legendre)
 	;
+
+	class_<uq::SALSA::State>(m, "uqSALSAState")
+		.def_readonly("alpha", &uq::SALSA::State::alpha)
+		.def_readonly("omega", &uq::SALSA::State::omega)
+		.def_readonly("x", &uq::SALSA::State::x)
+		.def_readonly("bestTrainingResidual", &uq::SALSA::State::trainingResidual)
+		.def_readonly("bestValidationResidual", &uq::SALSA::State::validationResidual)
+	;
+
+	class_<uq::SALSA>(m, "uqSALSA")
+		.def(init<TTTensor, std::vector<Tensor>, Tensor>())
+
+		.def_readwrite("controlSetFraction", &uq::SALSA::controlSetFraction)
+		.def_readwrite("targetResidual", &uq::SALSA::targetResidual)
+		.def_readwrite("minDecrease", &uq::SALSA::minDecrease)
+		.def_readwrite("maxSweeps", &uq::SALSA::maxSweeps)
+		.def_readwrite("trackingPeriodLength", &uq::SALSA::trackingPeriodLength)
+		.def_readwrite("maxStagnatingEpochs", &uq::SALSA::maxStagnatingEpochs)
+		.def_readwrite("kmin", &uq::SALSA::kmin)
+		.def_readwrite("maxRanks", &uq::SALSA::maxRanks)
+		.def_readwrite("maxIRsteps", &uq::SALSA::maxIRsteps)
+		.def_readwrite("IRtolerance", &uq::SALSA::IRtolerance)
+		.def_readwrite("sparsityThreshold", &uq::SALSA::sparsityThreshold)
+		.def_readwrite("fomega", &uq::SALSA::fomega)
+		.def_readwrite("omegaFactor", &uq::SALSA::omegaFactor)
+		.def_readwrite("falpha", &uq::SALSA::falpha)
+		.def_readwrite("alphaFactor", &uq::SALSA::alphaFactor)
+		.def_readwrite("basisWeights", &uq::SALSA::basisWeights)
+
+		.def_readonly("initialResidual", &uq::SALSA::initialResidual)
+		.def_readonly("bestIteration", &uq::SALSA::bestIteration)
+		.def_readonly("bestState", &uq::SALSA::bestState)
+
+		.def("run", &uq::SALSA::run)
+	;
 }
 

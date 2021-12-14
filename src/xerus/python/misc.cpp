@@ -33,28 +33,29 @@ void expose_misc(module& m) {
 		.value("TSV", misc::FileFormat::TSV)
 	;
 
-	/* m.def("save_to_file", static_cast<void (*)(const Tensor&)>(&misc::save_to_file), arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY); */
-	/* m.def("save_to_file", static_cast<void (*)(const TTTensor&)>(&misc::save_to_file), arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY); */
-	/* m.def("save_to_file", static_cast<void (*)(const TTOperator&)>(&misc::save_to_file), arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY); */
-	/* m.def("save_to_file", static_cast<void (*)(const TensorNetwork&)>(&misc::save_to_file), arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY); */
 	m.def("save_to_file", +[](const Tensor &_obj, const std::string &_filename, misc::FileFormat _format){
+		PyErr_WarnEx(PyExc_DeprecationWarning, "save_to_file() is deprecated, use Pythons pickle library instead.", 1);
 		misc::save_to_file(_obj, _filename, _format);
 	}, arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY);
 
 	m.def("save_to_file", +[](const TensorNetwork &_obj, const std::string &_filename, misc::FileFormat _format){
+		PyErr_WarnEx(PyExc_DeprecationWarning, "save_to_file() is deprecated, use Pythons pickle library instead.", 1);
 		misc::save_to_file(_obj, _filename, _format);
 	}, arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY);
 
 	m.def("save_to_file", +[](const TTTensor &_obj, const std::string &_filename, misc::FileFormat _format){
+		PyErr_WarnEx(PyExc_DeprecationWarning, "save_to_file() is deprecated, use Pythons pickle library instead.", 1);
 		misc::save_to_file(_obj, _filename, _format);
 	}, arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY);
 
 	m.def("save_to_file", +[](const TTOperator &_obj, const std::string &_filename, misc::FileFormat _format){
+		PyErr_WarnEx(PyExc_DeprecationWarning, "save_to_file() is deprecated, use Pythons pickle library instead.", 1);
 		misc::save_to_file(_obj, _filename, _format);
 	}, arg("object"), arg("filename"), arg("format")=misc::FileFormat::BINARY);
 
 	m.def("load_from_file", +[](std::string _filename){
 		// determine type stored in the file
+		PyErr_WarnEx(PyExc_DeprecationWarning, "load_from_file() is deprecated, use Pythons pickle library instead.", 1);
 		std::ifstream in(_filename);
 		if (!in) {
 			throw std::runtime_error("could not read file '" + _filename + "'");
