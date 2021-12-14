@@ -1,9 +1,9 @@
 {% set name = "Xerus" %}
 {% set version = "4.0.1" %}
-{% set branch = "v4.0.1_conda" %}
+{% set branch = "SALSA" %}
 
 package:
-  name: {{ name|lower }}
+  name: {{ name|lower + '_' + branch|lower }}
   version: {{ version }}
 
 source:
@@ -19,29 +19,36 @@ requirements:
   build:
     - {{ compiler('cxx') }}
     - make
+    - {{ pin_compatible('python', max_pin='x.x') }}
     - pip >=18.1
   host:
+    - python
+    - {{ pin_compatible('numpy') }}
+    - {{ pin_compatible('openblas', max_pin='x.x') }}
+    - {{ pin_compatible('suitesparse', max_pin='x.x') }}
+    - {{ pin_compatible('lapack') }}
+    - {{ pin_compatible('liblapacke') }}
+    - {{ pin_compatible('boost-cpp', max_pin='x.x.x') }}
+    - {{ pin_compatible('llvm-openmp') }}  # [osx]
+    - {{ pin_compatible('libgomp') }}      # [linux]
+  run:
     - python
     - numpy
     - openblas
     - suitesparse
     - lapack
-    - boost-cpp >=1.69.0  # boost-cpp: boost without python
+    - liblapacke
+    # - boost-cpp >=1.69.0  # boost-cpp: boost without python
+    - boost-cpp    # boost-cpp: boost without python
     - llvm-openmp  # [osx]
     - libgomp      # [linux]
-    #- gdb           # bfd
-    #- backward-cpp  # option for better python-like backtraces
-  run:
-    - {{ pin_compatible('python', max_pin='x.x') }}
-    - {{ pin_compatible('numpy') }}
-    - {{ pin_compatible('openblas', max_pin='x.x') }}
-    - {{ pin_compatible('suitesparse', max_pin='x.x') }}
-    - {{ pin_compatible('lapack') }}
-    - {{ pin_compatible('boost-cpp', max_pin='x.x.x') }}
-    - {{ pin_compatible('llvm-openmp') }}  # [osx]
-    - {{ pin_compatible('libgomp') }}      # [linux]
+    # #- gdb           # bfd
+    # #- backward-cpp  # option for better python-like backtraces
+  # run:
 
 test:
+  # requires:
+  #   - pytest  # pytest xerus/src/pyTests
   files:
     - VERSION
   source_files:

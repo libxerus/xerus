@@ -223,7 +223,7 @@ namespace xerus {
 			double work = 0;
 			lapack_int lwork = -1;
 			lapack_int min = std::min(m,n);
-			dgesdd_( &job, &n, &m, nullptr, &n, nullptr, nullptr, &n, nullptr, &min, &work, &lwork, nullptr, &info );
+			dgesdd_( &job, &n, &m, nullptr, &n, nullptr, nullptr, &n, nullptr, &min, &work, &lwork, nullptr, &info, 1 );
 			REQUIRE(info == 0, "work array size query of dgesdd returned " << info);
 			return lapack_int(work);
 		}
@@ -236,7 +236,7 @@ namespace xerus {
 			lapack_int min = std::min(m,n);
 			
 			// if A = U*S*V^T, then A^T = V^T*S*U^T, so instead of transposing all input and output matrices we can simply exchange the order of U and Vt
-			dgesdd_( &job, &n, &m, a, &n, s, vt, &n, u, &min, work, &lwork, iwork, &info );
+			dgesdd_( &job, &n, &m, a, &n, s, vt, &n, u, &min, work, &lwork, iwork, &info, 1 );
 			REQUIRE(info == 0, "dgesdd failed with info " << info);
 		}
 		
