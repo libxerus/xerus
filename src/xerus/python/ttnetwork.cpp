@@ -3,7 +3,7 @@
 void expose_ttnetwork(module& m) {
 	class_<TTTensor, TensorNetwork>(m, "TTTensor")
 		.def(pickle(
-			[](const TTTensor &_self) { // __getstate__
+			[](const TTTensor& _self) { // __getstate__
 				return bytes(misc::serialize(_self));
 			},
 			[](bytes _bytes) { // __setstate__
@@ -11,7 +11,7 @@ void expose_ttnetwork(module& m) {
 			}
 		))
 		.def(init<>(), "constructs an empty TTTensor")
-		.def(init<const TTTensor &>())
+		.def(init<const TTTensor&>())
 		.def(init<const Tensor&>())
 		.def(init<const Tensor&, value_t>())
 		.def(init<const Tensor&, value_t, size_t>())
@@ -79,6 +79,14 @@ void expose_ttnetwork(module& m) {
 	m.def("dyadic_product", static_cast<TTTensor (*)(const std::vector<TTTensor> &)>(&dyadic_product));
 
 	class_<TTOperator, TensorNetwork>(m, "TTOperator")
+		.def(pickle(
+			[](const TTOperator& _self) { // __getstate__
+				return bytes(misc::serialize(_self));
+			},
+			[](bytes _bytes) { // __setstate__
+				return misc::deserialize<TTOperator>(_bytes);
+			}
+		))
 		.def(init<const Tensor&>())
 		.def(init<const Tensor&, value_t>())
 		.def(init<const Tensor&, value_t, size_t>())

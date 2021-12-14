@@ -23,12 +23,9 @@ Tensor Tensor_from_buffer(buffer& _b) {
 		return Tensor({}, Tensor::Representation::Dense, Tensor::Initialisation::None);
 	}
 
-	std::vector<size_t> dims(info.shape.begin(), info.shape.end());
-	std::vector<size_t> strides(info.strides.begin(), info.strides.end());
-
-	Tensor result(dims, Tensor::Representation::Dense, Tensor::Initialisation::None);
+	std::vector<size_t> dimensions(info.shape.begin(), info.shape.end());
+	Tensor result(dimensions, Tensor::Representation::Dense, Tensor::Initialisation::None);
 	misc::copy(result.get_unsanitized_dense_data(), static_cast<double*>(info.ptr), result.size);
-
 	return result;
 }
 
@@ -43,16 +40,17 @@ void expose_tensor(module& m) {
 	;
 
 	class_<Tensor>(m, "Tensor", "a non-decomposed Tensor in either sparse or dense representation", buffer_protocol())
-	.def_buffer([](Tensor& t) -> buffer_info {
-		return buffer_info(
-			t.get_dense_data(),                    /* Pointer to buffer */
-			sizeof(value_t),                       /* Size of one scalar */
-			format_descriptor<value_t>::format(),  /* Python struct-style format descriptor */
-			t.order(),                             /* Number of dimensions */
-			t.dimensions,                          /* Buffer dimensions */
-			strides_from_dimensions_and_item_size(t.dimensions, sizeof(value_t))  /* Strides (in bytes) for each index */
-		);
-	})
+	// .def_buffer([](Tensor& t) -> buffer_info {
+	// 	std::cerr << "buffer" << std::endl;
+	// 	return buffer_info(
+	// 		t.get_dense_data(),                    /* Pointer to buffer */
+	// 		sizeof(value_t),                       /* Size of one scalar */
+	// 		format_descriptor<value_t>::format(),  /* Python struct-style format descriptor */
+	// 		t.order(),                             /* Number of dimensions */
+	// 		t.dimensions,                          /* Buffer dimensions */
+	// 		strides_from_dimensions_and_item_size(t.dimensions, sizeof(value_t))  /* Strides (in bytes) for each index */
+	// 	);
+	// })
 	.def(pickle(
 		[](const Tensor &_self) { // __getstate__
 			return bytes(misc::serialize(_self));
@@ -76,6 +74,15 @@ void expose_tensor(module& m) {
 		return Tensor(_dim, _f);
 	})
 	.def_static("from_buffer", &Tensor_from_buffer)
+	.def_static("from_ndarray", &Tensor_from_buffer)
+	.def("to_ndarray", +[](const xerus::Tensor& _self){
+		static_assert(std::is_same<value_t, double>::value);
+		Tensor* shcp = new xerus::Tensor(_self);  // create a shallow copy (this effectively increases its reference count for the required amount of time)
+		shcp->ensure_own_data_and_apply_factor();
+		shcp->use_dense_representation();
+		capsule cps(shcp, [](void *v) { delete reinterpret_cast<xerus::Tensor*>(v); });
+		return array(dtype::of<double>(), shcp->dimensions, shcp->get_unsanitized_dense_data(), cps);
+	})
 	.def_property_readonly("dimensions", +[](Tensor &_A) {
 		return _A.dimensions;
 	})
@@ -193,7 +200,7 @@ arg("dim")
 	.def("__str__", &Tensor::to_string)
 	/* .def(-self) */
 	.def("__neg__",
-		+[](TTTensor& _self) {
+		+[](Tensor& _self) {
 			return (-1)*_self;
 		})
 	.def(self + self)
@@ -206,7 +213,7 @@ arg("dim")
 	.def(self / value_t())
 	/* .def(self /= self) */
 	.def("__itruediv__",
-		+[](TTTensor& _self, const value_t _other) {
+		+[](Tensor& _self, const value_t _other) {
 			return (_self *= (1/_other));
 		})
 

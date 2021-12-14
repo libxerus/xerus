@@ -1,0 +1,243 @@
+diff --git src/xerus/applications/uqSALSA.cpp src/xerus/applications/uqSALSA.cpp
+index 0029fd6..96bf9bf 100644
+--- src/xerus/applications/uqSALSA.cpp
++++ src/xerus/applications/uqSALSA.cpp
+@@ -355,7 +355,7 @@ namespace xerus { namespace uq {
+ 
+ 		if(_position == 0) {
+ 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
+-			#pragma omp parallel for default(none) shared(leftRHSStack, values) firstprivate(N, _position, shuffledX)
++			#pragma omp parallel for shared(leftRHSStack, values) firstprivate(N, _position, shuffledX)
+ 			for(size_t i = 0; i < N; ++i) {
+ 				//NOTE: The first component is contracted directly (leftLHSStack[0] = shuffledX.T @ shuffledX).
+ 				//NOTE: Since shuffeldX is left-orthogonal leftLHSStack[0] is the identity.
+@@ -364,7 +364,7 @@ namespace xerus { namespace uq {
+ 		} else if(_position == 1) {
+ 			Tensor measCmp;
+ 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+-			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp)
++			#pragma omp parallel for shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp)
+ 			for(size_t j = 0; j < N; ++j) {
+ 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
+ 				//NOTE: leftLHSStack[0] is the identity
+@@ -374,7 +374,7 @@ namespace xerus { namespace uq {
+ 		} else {
+ 			Tensor measCmp, tmp;
+ 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+-			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp, tmp)
++			#pragma omp parallel for shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp, tmp)
+ 			for(size_t j = 0; j < N; ++j) {
+ 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
+ 				contract(tmp, leftLHSStack[_position-1][j], true, measCmp, false, 1);            // tmp(r2,u1) = stack[_pos-1](r1,r2) * measCmp(r1,u1)
+@@ -410,14 +410,14 @@ namespace xerus { namespace uq {
+ 		if(_position < M-1) {
+ 			Tensor measCmp;
+ 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+-			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX) private(measCmp)
++			#pragma omp parallel for shared(measures, rightStack) firstprivate(N, _position, shuffledX) private(measCmp)
+ 			for(size_t j = 0; j < N; ++j) {
+ 				contract(measCmp, measures[_position][j], shuffledX, 1);
+ 				contract(rightStack[_position][j], measCmp, rightStack[_position+1][j], 1);
+ 			}
+ 		} else {  // _position == M-1
+ 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.rank(M-2), x.dimensions[M-1]});  // Remove dangling 1-mode
+-			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX)
++			#pragma omp parallel for shared(measures, rightStack) firstprivate(N, _position, shuffledX)
+ 			for(size_t j = 0; j < N; ++j) {
+ 				contract(rightStack[_position][j], shuffledX, measures[_position][j], 1);
+ 			}
+@@ -538,7 +538,7 @@ namespace xerus { namespace uq {
+ 		const Tensor shuffledX = reinterpret_dimensions(x.get_component(0), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
+ 		Tensor tmp;
+ 		double res = 0.0, valueNorm = 0.0;
+-		#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm)
++		#pragma omp parallel for firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm)
+ 		for(size_t j = from; j < to; ++j) {
+ 			contract(tmp, shuffledX, rightStack[1][j], 1);
+ 			res += misc::sqr(frob_norm(values[j] - tmp));
+@@ -626,7 +626,7 @@ namespace xerus { namespace uq {
+ 			rhs = Tensor({e,r}, Tensor::Representation::Dense);
+ 			Tensor tmp;
+ 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+-			#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(_slice, e, pos) private(tmp) reduction(+:op,rhs)
++			#pragma omp parallel for firstprivate(_slice, e, pos) private(tmp) reduction(+:op,rhs)
+ 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+ 				contract(tmp, Tensor::identity({e,e}), rightStack[pos+1][i], 0);
+ 				contract(tmp, tmp, rightStack[pos+1][i], 0);
+@@ -644,7 +644,7 @@ namespace xerus { namespace uq {
+ 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+ 			Tensor tmp;
+ 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+-			#pragma omp parallel for default(none) shared(leftRHSStack, rightStack, measures) firstprivate(_slice, l, e, pos) private(tmp) reduction(+:op,rhs)
++			#pragma omp parallel for firstprivate(_slice, l, e, pos) private(tmp) reduction(+:op,rhs)
+ 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+ 				contract(tmp, measures[pos][i], rightStack[pos+1][i], 0);
+ 				contract(tmp, tmp, measures[pos][i], 0);
+@@ -663,7 +663,7 @@ namespace xerus { namespace uq {
+ 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+ 			Tensor tmp;
+ 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(_slice, pos) private(tmp) reduction(+:op,rhs)
++			#pragma omp parallel for firstprivate(_slice, pos) private(tmp) reduction(+:op,rhs)
+ 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+ 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+ 				contract(tmp, tmp, rightStack[pos+1][i], 0);
+@@ -689,7 +689,7 @@ namespace xerus { namespace uq {
+ 			rhs = Tensor({l,e}, Tensor::Representation::Dense);
+ 			Tensor tmp;
+ 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(_slice, pos, l, e) private(tmp) reduction(+:op,rhs)
++			#pragma omp parallel for firstprivate(_slice, pos, l, e) private(tmp) reduction(+:op,rhs)
+ 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+ 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+ 				contract(tmp, tmp, measures[pos][i], 0);
+@@ -750,7 +750,7 @@ namespace xerus { namespace uq {
+ 		}
+ 
+ 		size_t density = 0; // np.count_nonzero(abs(sol) > sparsityThreshold)/sol.size
+-		#pragma omp parallel for default(none) firstprivate(core, sparsityThreshold) reduction(+:density)
++		#pragma omp parallel for firstprivate(core, sparsityThreshold) reduction(+:density)
+ 		for (size_t j=0; j<core.size; ++j) {
+ 			density += std::abs(core[j]) > sparsityThreshold;
+ 		}
+@@ -820,14 +820,14 @@ namespace xerus { namespace uq {
+ 		validationSet = std::make_pair(Nt, N);
+ 
+ 		valueNorm_trainingSet = 0.0;
+-		#pragma omp parallel for default(none) shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet)
++		#pragma omp parallel for shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet)
+ 		for(size_t j=trainingSet.first; j<trainingSet.second; ++j) {
+ 			valueNorm_trainingSet += misc::sqr(frob_norm(values[j]));
+ 		}
+ 		valueNorm_trainingSet = std::sqrt(valueNorm_trainingSet);
+ 
+ 		valueNorm_validationSet = 0.0;
+-		#pragma omp parallel for default(none) shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet)
++		#pragma omp parallel for shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet)
+ 		for(size_t j=validationSet.first; j<validationSet.second; ++j) {
+ 			valueNorm_validationSet += misc::sqr(frob_norm(values[j]));
+ 		}
+diff --git uqSALSA_openmp_g++-8.patch uqSALSA_openmp_g++-8.patch
+index 00e452d..e69de29 100644
+--- uqSALSA_openmp_g++-8.patch
++++ uqSALSA_openmp_g++-8.patch
+@@ -1,119 +0,0 @@
+-diff --git src/xerus/applications/uqSALSA.cpp src/xerus/applications/uqSALSA.cpp
+-index 0029fd6..8f0cdf4 100644
+---- src/xerus/applications/uqSALSA.cpp
+-+++ src/xerus/applications/uqSALSA.cpp
+-@@ -355,7 +355,7 @@ namespace xerus { namespace uq {
+- 
+- 		if(_position == 0) {
+- 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
+--			#pragma omp parallel for default(none) shared(leftRHSStack, values) firstprivate(N, _position, shuffledX)
+-+			#pragma omp parallel for shared(leftRHSStack, values) firstprivate(N, _position, shuffledX)
+- 			for(size_t i = 0; i < N; ++i) {
+- 				//NOTE: The first component is contracted directly (leftLHSStack[0] = shuffledX.T @ shuffledX).
+- 				//NOTE: Since shuffeldX is left-orthogonal leftLHSStack[0] is the identity.
+-@@ -364,7 +364,7 @@ namespace xerus { namespace uq {
+- 		} else if(_position == 1) {
+- 			Tensor measCmp;
+- 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+--			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp)
+-+			#pragma omp parallel for shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp)
+- 			for(size_t j = 0; j < N; ++j) {
+- 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
+- 				//NOTE: leftLHSStack[0] is the identity
+-@@ -374,7 +374,7 @@ namespace xerus { namespace uq {
+- 		} else {
+- 			Tensor measCmp, tmp;
+- 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+--			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp, tmp)
+-+			#pragma omp parallel for shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp, tmp)
+- 			for(size_t j = 0; j < N; ++j) {
+- 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
+- 				contract(tmp, leftLHSStack[_position-1][j], true, measCmp, false, 1);            // tmp(r2,u1) = stack[_pos-1](r1,r2) * measCmp(r1,u1)
+-@@ -410,14 +410,14 @@ namespace xerus { namespace uq {
+- 		if(_position < M-1) {
+- 			Tensor measCmp;
+- 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
+--			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX) private(measCmp)
+-+			#pragma omp parallel for shared(measures, rightStack) firstprivate(N, _position, shuffledX) private(measCmp)
+- 			for(size_t j = 0; j < N; ++j) {
+- 				contract(measCmp, measures[_position][j], shuffledX, 1);
+- 				contract(rightStack[_position][j], measCmp, rightStack[_position+1][j], 1);
+- 			}
+- 		} else {  // _position == M-1
+- 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.rank(M-2), x.dimensions[M-1]});  // Remove dangling 1-mode
+--			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX)
+-+			#pragma omp parallel for shared(measures, rightStack) firstprivate(N, _position, shuffledX)
+- 			for(size_t j = 0; j < N; ++j) {
+- 				contract(rightStack[_position][j], shuffledX, measures[_position][j], 1);
+- 			}
+-@@ -538,7 +538,7 @@ namespace xerus { namespace uq {
+- 		const Tensor shuffledX = reinterpret_dimensions(x.get_component(0), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
+- 		Tensor tmp;
+- 		double res = 0.0, valueNorm = 0.0;
+--		#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm)
+-+		#pragma omp parallel for shared(rightStack, values) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm)
+- 		for(size_t j = from; j < to; ++j) {
+- 			contract(tmp, shuffledX, rightStack[1][j], 1);
+- 			res += misc::sqr(frob_norm(values[j] - tmp));
+-@@ -626,7 +626,7 @@ namespace xerus { namespace uq {
+- 			rhs = Tensor({e,r}, Tensor::Representation::Dense);
+- 			Tensor tmp;
+- 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+--			#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(_slice, e, pos) private(tmp) reduction(+:op,rhs)
+-+			#pragma omp parallel for shared(rightStack, values) firstprivate(_slice, e, pos) private(tmp) reduction(+:op,rhs)
+- 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+- 				contract(tmp, Tensor::identity({e,e}), rightStack[pos+1][i], 0);
+- 				contract(tmp, tmp, rightStack[pos+1][i], 0);
+-@@ -644,7 +644,7 @@ namespace xerus { namespace uq {
+- 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+- 			Tensor tmp;
+- 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+--			#pragma omp parallel for default(none) shared(leftRHSStack, rightStack, measures) firstprivate(_slice, l, e, pos) private(tmp) reduction(+:op,rhs)
+-+			#pragma omp parallel for shared(leftRHSStack, rightStack, measures) firstprivate(_slice, l, e, pos) private(tmp) reduction(+:op,rhs)
+- 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+- 				contract(tmp, measures[pos][i], rightStack[pos+1][i], 0);
+- 				contract(tmp, tmp, measures[pos][i], 0);
+-@@ -663,7 +663,7 @@ namespace xerus { namespace uq {
+- 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense);
+- 			Tensor tmp;
+- 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+--			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(_slice, pos) private(tmp) reduction(+:op,rhs)
+-+			#pragma omp parallel for shared(leftLHSStack, leftRHSStack, rightStack, measures) firstprivate(_slice, pos) private(tmp) reduction(+:op,rhs)
+- 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+- 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+- 				contract(tmp, tmp, rightStack[pos+1][i], 0);
+-@@ -689,7 +689,7 @@ namespace xerus { namespace uq {
+- 			rhs = Tensor({l,e}, Tensor::Representation::Dense);
+- 			Tensor tmp;
+- 			#pragma omp declare reduction(+: Tensor: omp_out += omp_in) initializer(omp_priv = Tensor(omp_orig.dimensions))
+--			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures) firstprivate(_slice, pos, l, e) private(tmp) reduction(+:op,rhs)
+-+			#pragma omp parallel for shared(leftLHSStack, leftRHSStack, measures) firstprivate(_slice, pos, l, e) private(tmp) reduction(+:op,rhs)
+- 			for (size_t i=_slice.first; i<_slice.second; ++i) {
+- 				contract(tmp, leftLHSStack[pos-1][i], measures[pos][i], 0);
+- 				contract(tmp, tmp, measures[pos][i], 0);
+-@@ -750,7 +750,7 @@ namespace xerus { namespace uq {
+- 		}
+- 
+- 		size_t density = 0; // np.count_nonzero(abs(sol) > sparsityThreshold)/sol.size
+--		#pragma omp parallel for default(none) firstprivate(core, sparsityThreshold) reduction(+:density)
+-+		#pragma omp parallel for firstprivate(core, sparsityThreshold) reduction(+:density)
+- 		for (size_t j=0; j<core.size; ++j) {
+- 			density += std::abs(core[j]) > sparsityThreshold;
+- 		}
+-@@ -820,14 +820,14 @@ namespace xerus { namespace uq {
+- 		validationSet = std::make_pair(Nt, N);
+- 
+- 		valueNorm_trainingSet = 0.0;
+--		#pragma omp parallel for default(none) shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet)
+-+		#pragma omp parallel for shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet)
+- 		for(size_t j=trainingSet.first; j<trainingSet.second; ++j) {
+- 			valueNorm_trainingSet += misc::sqr(frob_norm(values[j]));
+- 		}
+- 		valueNorm_trainingSet = std::sqrt(valueNorm_trainingSet);
+- 
+- 		valueNorm_validationSet = 0.0;
+--		#pragma omp parallel for default(none) shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet)
+-+		#pragma omp parallel for shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet)
+- 		for(size_t j=validationSet.first; j<validationSet.second; ++j) {
+- 			valueNorm_validationSet += misc::sqr(frob_norm(values[j]));
+- 		}
