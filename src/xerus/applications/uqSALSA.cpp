@@ -492,7 +492,7 @@ namespace xerus { namespace uq {
 
 		if(_position == 0) {
 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
-			#pragma omp parallel for default(none) shared(leftRHSStack, values) firstprivate(N, _position, shuffledX) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(N, _position, shuffledX) schedule(static)
 			for(size_t i = 0; i < N; ++i) {
 				//NOTE: The first component is contracted directly (leftLHSStack[0] = shuffledX.T @ shuffledX).
 				//NOTE: Since shuffeldX is left-orthogonal leftLHSStack[0] is the identity.
@@ -501,7 +501,7 @@ namespace xerus { namespace uq {
 		} else if(_position == 1) {
 			Tensor measCmp;
 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
-			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(N, _position, shuffledX) private(measCmp) schedule(static)
 			for(size_t j = 0; j < N; ++j) {
 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
 				//NOTE: leftLHSStack[0] is the identity
@@ -511,7 +511,7 @@ namespace xerus { namespace uq {
 		} else {
 			Tensor measCmp, tmp;
 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
-			#pragma omp parallel for default(none) shared(measures, leftLHSStack, leftRHSStack) firstprivate(N, _position, shuffledX) private(measCmp, tmp) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(N, _position, shuffledX) private(measCmp, tmp) schedule(static)
 			for(size_t j = 0; j < N; ++j) {
 				contract(measCmp, measures[_position][j], shuffledX, 1);                         // ler,e -> lr
 				contract(tmp, leftLHSStack[_position-1][j], true, measCmp, false, 1);            // tmp(r2,u1) = stack[_pos-1](r1,r2) * measCmp(r1,u1)
@@ -547,14 +547,14 @@ namespace xerus { namespace uq {
 		if(_position < M-1) {
 			Tensor measCmp;
 			const Tensor shuffledX = reshuffle(x.get_component(_position), {1, 0, 2});
-			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX) private(measCmp) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(N, _position, shuffledX) private(measCmp) schedule(static)
 			for(size_t j = 0; j < N; ++j) {
 				contract(measCmp, measures[_position][j], shuffledX, 1);
 				contract(rightStack[_position][j], measCmp, rightStack[_position+1][j], 1);
 			}
 		} else {  // _position == M-1
 			const Tensor shuffledX = reinterpret_dimensions(x.get_component(_position), {x.rank(M-2), x.dimensions[M-1]});  // Remove dangling 1-mode
-			#pragma omp parallel for default(none) shared(measures, rightStack) firstprivate(N, _position, shuffledX) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(N, _position, shuffledX) schedule(static)
 			for(size_t j = 0; j < N; ++j) {
 				contract(rightStack[_position][j], shuffledX, measures[_position][j], 1);
 			}
@@ -663,7 +663,7 @@ namespace xerus { namespace uq {
 		const Tensor shuffledX = reinterpret_dimensions(x.get_component(0), {x.dimensions[0], x.rank(0)});  // Remove dangling 1-mode
 		Tensor tmp;
 		double res = 0.0, valueNorm = 0.0;
-		#pragma omp parallel for default(none) shared(rightStack, values) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm) schedule(static)
+		#pragma omp parallel for default(none) firstprivate(from, to, shuffledX) private(tmp) reduction(+:res,valueNorm) schedule(static)
 		for(size_t j = from; j < to; ++j) {
 			contract(tmp, shuffledX, rightStack[1][j], 1);
 			res += misc::sqr(frob_norm(values[j] - tmp));
@@ -889,7 +889,7 @@ namespace xerus { namespace uq {
 			rhs = Tensor({e,r}, Tensor::Representation::Dense, Tensor::Initialisation::Zero);
 			// The ordering (r << e) is important for cache locality!
 
-			#pragma omp parallel for default(none) shared(leftRHSStack, measures, rightStack) firstprivate(_slice, pos) reduction(+:tmp,rhs) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(_slice, pos) reduction(+:tmp,rhs) schedule(static)
 			for (size_t i=_slice.first; i<_slice.second; ++i) {
 				add_rank_one<2>(tmp, {rightStack[pos+1][i], rightStack[pos+1][i]});
 				add_rank_one<2>(rhs, {values[i], rightStack[pos+1][i]});
@@ -905,7 +905,7 @@ namespace xerus { namespace uq {
 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense, Tensor::Initialisation::Zero);
 			// The ordering (l,r << e) is important for cache locality!
 
-			#pragma omp parallel for default(none) shared(leftRHSStack, measures, rightStack) firstprivate(_slice, pos) reduction(+:tmp,rhs) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(_slice, pos) reduction(+:tmp,rhs) schedule(static)
 			for (size_t i=_slice.first; i<_slice.second; ++i) {
 				add_rank_one<4>(tmp, {measures[pos][i], rightStack[pos+1][i], measures[pos][i], rightStack[pos+1][i]});
 				add_rank_one<3>(rhs, {leftRHSStack[pos-1][i], measures[pos][i], rightStack[pos+1][i]});
@@ -923,7 +923,7 @@ namespace xerus { namespace uq {
 			rhs = Tensor({l,e,r}, Tensor::Representation::Dense, Tensor::Initialisation::Zero);
 			// The ordering (l,r << e) is important for cache locality!
 
-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures, rightStack) firstprivate(_slice, pos) reduction(+:op,rhs) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(_slice, pos) reduction(+:op,rhs) schedule(static)
 			for (size_t i=_slice.first; i<_slice.second; ++i) {
 				add_rank_one<5>(op, {measures[pos][i], rightStack[pos+1][i], leftLHSStack[pos-1][i], measures[pos][i], rightStack[pos+1][i]});
 				add_rank_one<3>(rhs, {leftRHSStack[pos-1][i], measures[pos][i], rightStack[pos+1][i]});
@@ -935,7 +935,7 @@ namespace xerus { namespace uq {
 			rhs = Tensor({e,l}, Tensor::Representation::Dense, Tensor::Initialisation::Zero);
 			// The ordering (l << e) is important for cache locality!
 
-			#pragma omp parallel for default(none) shared(leftLHSStack, leftRHSStack, measures, rightStack) firstprivate(_slice, pos) reduction(+:op,rhs) schedule(static)
+			#pragma omp parallel for default(none) firstprivate(_slice, pos) reduction(+:op,rhs) schedule(static)
 			for (size_t i=_slice.first; i<_slice.second; ++i) {
 				add_rank_one<3>(op, {leftLHSStack[pos-1][i], measures[pos][i], measures[pos][i]});
 				add_rank_one<2>(rhs, {measures[pos][i], leftRHSStack[pos-1][i]});
@@ -1110,14 +1110,14 @@ namespace xerus { namespace uq {
 		validationSet = std::make_pair(Nt, N);
 
 		valueNorm_trainingSet = 0.0;
-		#pragma omp parallel for default(none) shared(values) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet) schedule(static)
+		#pragma omp parallel for default(none) firstprivate(trainingSet) reduction(+:valueNorm_trainingSet) schedule(static)
 		for(size_t j=trainingSet.first; j<trainingSet.second; ++j) {
 			valueNorm_trainingSet += misc::sqr(frob_norm(values[j]));
 		}
 		valueNorm_trainingSet = std::sqrt(valueNorm_trainingSet);
 
 		valueNorm_validationSet = 0.0;
-		#pragma omp parallel for default(none) shared(values) firstprivate(validationSet) reduction(+:valueNorm_validationSet) schedule(static)
+		#pragma omp parallel for default(none) firstprivate(validationSet) reduction(+:valueNorm_validationSet) schedule(static)
 		for(size_t j=validationSet.first; j<validationSet.second; ++j) {
 			valueNorm_validationSet += misc::sqr(frob_norm(values[j]));
 		}
