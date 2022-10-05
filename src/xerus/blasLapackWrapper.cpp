@@ -47,6 +47,23 @@ extern "C"
 	#include <lapacke.h>
 #endif
 
+#if defined(LAPACK_GLOBAL) || defined(LAPACK_NAME)
+/*
+ * Using netlib's reference LAPACK implementation version >= 3.4.0 (first with C interface).
+ * Use LAPACK_xxxx to transparently (via predefined lapack macros) deal with pre and post 3.9.1 versions.
+ * LAPACK 3.9.1 introduces LAPACK_FORTRAN_STRLEN_END and modifies (through preprocessing) the declarations of the following functions used in xerus
+ *        dgesdd_, dgeqp3_ , dorgqr_
+ * which end up with an extra parameter.
+ * So we also need to preprocess the function calls in xerus coding by prefixing them with LAPACK_.
+ * The good news is the preprocessing works fine whatever netlib's LAPACK version.
+ * This fix is taken from opencv 4.6.0.
+ */
+#define XERUS_LAPACK_FUNC(f) LAPACK_##f
+#else
+/* Using other LAPACK implementations so fall back to xerus's assumption until now. */
+#define XERUS_LAPACK_FUNC(f) f##_
+#endif
+
 
 #include <memory>
 #include <xerus/misc/standard.h>
@@ -223,7 +240,7 @@ namespace xerus {
 			double work = 0;
 			lapack_int lwork = -1;
 			lapack_int min = std::min(m,n);
-			dgesdd_( &job, &n, &m, nullptr, &n, nullptr, nullptr, &n, nullptr, &min, &work, &lwork, nullptr, &info );
+			XERUS_LAPACK_FUNC(dgesdd)( &job, &n, &m, nullptr, &n, nullptr, nullptr, &n, nullptr, &min, &work, &lwork, nullptr, &info );
 			REQUIRE(info == 0, "work array size query of dgesdd returned " << info);
 			return lapack_int(work);
 		}
@@ -236,7 +253,7 @@ namespace xerus {
 			lapack_int min = std::min(m,n);
 			
 			// if A = U*S*V^T, then A^T = V^T*S*U^T, so instead of transposing all input and output matrices we can simply exchange the order of U and Vt
-			dgesdd_( &job, &n, &m, a, &n, s, vt, &n, u, &min, work, &lwork, iwork, &info );
+			XERUS_LAPACK_FUNC(dgesdd)( &job, &n, &m, a, &n, s, vt, &n, u, &min, work, &lwork, iwork, &info );
 			REQUIRE(info == 0, "dgesdd failed with info " << info);
 		}
 		
@@ -290,13 +307,13 @@ namespace xerus {
 			lapack_int lwork = -1;
 			double work_query = 0;
 			// query work array size
-			dgeqp3_(&m, &n, nullptr, &m, nullptr, nullptr, &work_query, &lwork, &info);
+			XERUS_LAPACK_FUNC(dgeqp3)(&m, &n, nullptr, &m, nullptr, nullptr, &work_query, &lwork, &info);
 			REQUIRE(info == 0, "dgeqp3 (QC) work size query failed. info = " << info);
 			lwork = lapack_int(work_query);
 			std::unique_ptr<double[]> work(new double[size_t(lwork)]);
 			
 			// perform factorization
-			dgeqp3_(&m, &n, tA.get(), &m, permutation.get(), tau.get(), work.get(), &lwork, &info);
+			XERUS_LAPACK_FUNC(dgeqp3)(&m, &n, tA.get(), &m, permutation.get(), tau.get(), work.get(), &lwork, &info);
 			REQUIRE(info == 0, "dgeqp3 (QC) failed. info = " << info);
 			
 			
@@ -326,14 +343,14 @@ namespace xerus {
 			// Create orthogonal matrix Q
 			lapack_int lwork2 = -1;
 			lapack_int min = std::min(m,n);
-			dorgqr_(&m, &min, &min, nullptr, &m, nullptr, &work_query, &lwork2, &info);
+			XERUS_LAPACK_FUNC(dorgqr)(&m, &min, &min, nullptr, &m, nullptr, &work_query, &lwork2, &info);
 			REQUIRE(info == 0, "dorgqr_ (QC) getting work array size failed. info = " << info);
 			lwork2 = lapack_int(work_query);
 			if (lwork2 > lwork) {
 				lwork = lwork2;
 				work.reset(new double[size_t(lwork)]);
 			}
-			dorgqr_(&m, &min, &min, tA.get(), &m, tau.get(), work.get(), &lwork, &info);
+			XERUS_LAPACK_FUNC(dorgqr)(&m, &min, &min, tA.get(), &m, tau.get(), work.get(), &lwork, &info);
 			REQUIRE(info == 0, "dorgqr_ (QC) failed. info = " << info);
 			
 			// Copy the newly created Q into position
